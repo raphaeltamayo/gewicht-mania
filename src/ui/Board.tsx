@@ -1,0 +1,547 @@
+import { useEffect, useMemo, useState } from 'react';
+import { RULES, attackCount } from '../engine/config';
+import {
+  OTHER,
+  SUIT_META,
+  isHidden,
+  type Action,
+  type AnyCard,
+  type Card,
+  type GameState,
+  type PlayerId,
+} from '../engine/types';
+import type { Session } from '../net/session';
+import { BetChip, CardView, TrainPanel } from './pieces';
+
+const asCard = (c: AnyCard | null): Card | null => (c && !isHidden(c) ? c : null);
+
+const PHASE_TITLE: Record<GameState['phase'], string> = {
+  lobby: 'En attente',
+  betting: 'Étape 2 — Phase de réflexion',
+  reveal: 'Étape 3 — Phase de révélation',
+  riverDuel: 'Étape 3 — Duels de rivière',
+  buff: 'Étape 4 — Buff',
+  attackPlacement: 'Étape 4 — Placement des attaques',
+  battle: 'Étape 4 — Bataille',
+  damage: 'Étape 4 — Dégâts',
+  roundEnd: 'Fin de manche',
+  gameOver: 'Partie terminée',
+};
+
+export function Board({ session }: { session: Session }) {
+  const view = session.view!;
+  const me = session.seat;
+  const foe = OTHER[me];
+  const mine = view.players[me];
+  const theirs = view.players[foe];
+  const dispatch = session.dispatch;
+
+  const [selectedBet, setSelectedBet] = useState<number | null>(null);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [curtain, setCurtain] = useState(false);
+
+  // Selections never survive a phase change.
+  useEffect(() => {
+    setSelectedBet(null);
+    setSelectedCard(null);
+  }, [view.phase, view.round]);
+
+  useBetTimer(view, dispatch, session.mode !== 'guest');
+
+  const unplacedBets = useMemo(() => {
+    const placed = new Set(mine.bets.filter((b): b is number => b !== null));
+    return Array.from({ length: RULES.betMax }, (_, i) => i + 1).filter((v) => !placed.has(v));
+  }, [mine.bets]);
+
+  const handClickable = handIsClickable(view.phase);
+
+  function onHandCard(card: Card) {
+    switch (view.phase) {
+      case 'buff':
+        if (!mine.buff) dispatch({ type: 'setBuff', player: me, cardId: card.id });
+        break;
+      case 'riverDuel':
+      case 'battle': {
+        const duel = view.phase === 'riverDuel' ? view.riverDuel : view.battleDuels[view.battleIndex];
+        if (!duel || duel.pending[me]) break;
+        if (view.phase === 'battle' && !(duel.revealed && duel.winner === null)) break;
+        dispatch({ type: 'commitDuelCard', player: me, cardId: card.id });
+        break;
+      }
+      case 'attackPlacement':
+        setSelectedCard((prev) => (prev === card.id ? null : card.id));
+        break;
+      default:
+        break;
+    }
+  }
+
+  function onRiverSlot(index: number) {
+    if (view.phase !== 'betting' || mine.betsLocked) return;
+    if (selectedBet !== null) {
+      dispatch({ type: 'placeBet', player: me, slot: index, value: selectedBet });
+      setSelectedBet(null);
+    } else if (mine.bets[index] !== null) {
+      dispatch({ type: 'clearBet', player: me, slot: index });
+    }
+  }
+
+  function onAttackSlot(index: number) {
+    if (view.phase !== 'attackPlacement' || mine.attacksLocked) return;
+    if (selectedCard) {
+      dispatch({ type: 'placeAttack', player: me, slot: index, cardId: selectedCard });
+      setSelectedCard(null);
+    } else if (mine.attacks[index]) {
+      dispatch({ type: 'clearAttack', player: me, slot: index });
+    }
+  }
+
+  const riverStage = view.phase === 'betting' || view.phase === 'reveal' || view.phase === 'riverDuel';
+
+  return (
+    <div className="board">
+      <Header session={session} />
+
+      <TrainPanel player={theirs} label={`Adversaire (${foe})`} stats={theirs.stats} />
+
+      <div className="opp-hand">
+        <span>Main adverse</span>
+        <div className="opp-hand__cards">
+          {theirs.hand.map((c, i) => (
+            <CardView key={i} card={c} small />
+          ))}
+        </div>
+      </div>
+
+      {riverStage ? (
+        <section className="river">
+          <div className="river__row river__row--bets">
+            {theirs.bets.map((b, i) => (
+              <BetChip key={i} value={b} hidden={b === null && view.phase !== 'betting'} />
+            ))}
+          </div>
+
+          <div className="river__row">
+            {view.river.map((slot, i) => {
+              const contested = slot.resolution === 'contested';
+              const duelHere = view.phase === 'riverDuel' && view.riverDuelSlot === i;
+              return (
+                <div
+                  key={i}
+                  className={`slot ${slot.resolution === 'won' ? `is-won is-won--${slot.winner ?? 'none'}` : ''} ${
+                    contested ? 'is-contested' : ''
+                  } ${duelHere ? 'is-active' : ''} ${view.phase === 'reveal' && i === view.revealIndex ? 'is-next' : ''}`}
+                  onClick={() => onRiverSlot(i)}
+                >
+                  <CardView card={slot.card} muted={slot.resolution === 'won'} />
+                  {slot.resolution === 'won' && <span className="slot__tag">{slot.winner ?? '—'}</span>}
+                  {contested && <span className="slot__tag slot__tag--tie">=</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="river__row river__row--bets">
+            {mine.bets.map((b, i) => (
+              <BetChip key={i} value={b} onClick={() => onRiverSlot(i)} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <BattleStage view={view} me={me} onAttackSlot={onAttackSlot} />
+      )}
+
+      <TrainPanel player={mine} label={`Toi (${me})`} stats={mine.stats} />
+
+      <PhaseBar
+        view={view}
+        me={me}
+        dispatch={dispatch}
+        unplacedBets={unplacedBets}
+        selectedBet={selectedBet}
+        setSelectedBet={setSelectedBet}
+      />
+
+      <section className="hand">
+        <div className="hand__label">
+          Ta main <span className="muted">({mine.hand.length})</span>
+        </div>
+        <div className="hand__cards">
+          {mine.hand.map((c, i) => {
+            const card = asCard(c);
+            if (!card) return <CardView key={i} card={c} />;
+            return (
+              <CardView
+                key={card.id}
+                card={card}
+                selected={selectedCard === card.id}
+                onClick={handClickable ? () => onHandCard(card) : undefined}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <LogView view={view} />
+
+      {session.mode === 'local' && (
+        <div className="hotseat">
+          <button
+            type="button"
+            onClick={() => {
+              setCurtain(true);
+              session.switchSeat(foe);
+            }}
+          >
+            Passer la main au joueur {foe}
+          </button>
+        </div>
+      )}
+
+      {curtain && (
+        <div className="curtain">
+          <p>Passe l'appareil au joueur {me}.</p>
+          <button type="button" onClick={() => setCurtain(false)}>
+            Je suis {me} — afficher
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function handIsClickable(phase: GameState['phase']) {
+  return phase === 'buff' || phase === 'attackPlacement' || phase === 'riverDuel' || phase === 'battle';
+}
+
+function Header({ session }: { session: Session }) {
+  const view = session.view!;
+  const statusText: Record<string, string> = {
+    idle: '',
+    waiting: 'en attente du second joueur',
+    connecting: 'connexion…',
+    connected: 'connecté',
+    disconnected: 'déconnecté',
+    error: `erreur : ${session.error}`,
+  };
+  return (
+    <header className="topbar">
+      <div>
+        <strong>Manche {view.round}</strong>
+        <span className="muted"> · {PHASE_TITLE[view.phase]}</span>
+      </div>
+      <div className="topbar__right">
+        {session.mode !== 'local' && (
+          <span className={`pill pill--${session.status}`}>
+            {session.code && <code>{session.code}</code>} {statusText[session.status]}
+          </span>
+        )}
+        <span className="pill">Siège {session.seat}</span>
+      </div>
+    </header>
+  );
+}
+
+function BattleStage({
+  view,
+  me,
+  onAttackSlot,
+}: {
+  view: GameState;
+  me: PlayerId;
+  onAttackSlot: (i: number) => void;
+}) {
+  const foe = OTHER[me];
+  const mine = view.players[me];
+  const theirs = view.players[foe];
+
+  return (
+    <section className="battle">
+      <div className="battle__buffs">
+        <BuffSlot label={`Buff ${foe}`} card={theirs.buff} />
+        <BuffSlot label="Ton buff" card={mine.buff} />
+      </div>
+
+      <div className="battle__duels">
+        {Array.from({ length: attackCount(view.round) }).map((_, i) => {
+          const duel = view.battleDuels[i];
+          const active = view.phase === 'battle' && view.battleIndex === i;
+          const stackFoe = duel ? duel.stacks[foe] : theirs.attacks[i] ? [theirs.attacks[i]!] : [];
+          const stackMine = duel ? duel.stacks[me] : mine.attacks[i] ? [mine.attacks[i]!] : [];
+          return (
+            <div key={i} className={`duel ${active ? 'is-active' : ''} ${duel?.winner ? `won-${duel.winner}` : ''}`}>
+              <div className="duel__stack">
+                {stackFoe.length ? stackFoe.map((c, k) => <CardView key={k} card={c} small />) : <CardView card={null} small />}
+              </div>
+              <div className="duel__verdict">
+                {duel?.winner === 'draw' ? 'nul' : duel?.winner ? (duel.winner === me ? 'gagné' : 'perdu') : `#${i + 1}`}
+              </div>
+              <div className="duel__stack" onClick={() => onAttackSlot(i)}>
+                {stackMine.length ? (
+                  stackMine.map((c, k) => <CardView key={k} card={c} small />)
+                ) : (
+                  <CardView card={null} small onClick={() => onAttackSlot(i)} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BuffSlot({ label, card }: { label: string; card: AnyCard | null }) {
+  return (
+    <div className="buffslot">
+      <span className="muted">{label}</span>
+      <CardView card={card} small />
+      {asCard(card) && (
+        <span className="buffslot__effect">
+          +{asCard(card)!.value} {SUIT_META[asCard(card)!.suit].stat}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PhaseBar({
+  view,
+  me,
+  dispatch,
+  unplacedBets,
+  selectedBet,
+  setSelectedBet,
+}: {
+  view: GameState;
+  me: PlayerId;
+  dispatch: (a: Action) => void;
+  unplacedBets: number[];
+  selectedBet: number | null;
+  setSelectedBet: (v: number | null) => void;
+}) {
+  const mine = view.players[me];
+  const theirs = view.players[OTHER[me]];
+
+  switch (view.phase) {
+    case 'betting':
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            {mine.betsLocked
+              ? 'Mises figées — en attente de l’adversaire.'
+              : 'Choisis une mise, puis clique la case sous la carte de rivière.'}
+          </div>
+          {!mine.betsLocked && (
+            <div className="bettray">
+              {unplacedBets.map((v) => (
+                <BetChip key={v} value={v} selected={selectedBet === v} onClick={() => setSelectedBet(selectedBet === v ? null : v)} />
+              ))}
+            </div>
+          )}
+          <div className="phasebar__actions">
+            <Countdown deadline={view.betDeadline} />
+            <button
+              type="button"
+              disabled={mine.betsLocked || mine.bets.some((b) => b === null)}
+              onClick={() => dispatch({ type: 'lockBets', player: me })}
+            >
+              Valider mes mises
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'reveal':
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            Cartes remportées — toi {mine.riverWins} / adversaire {theirs.riverWins}
+          </div>
+          <div className="phasebar__actions">
+            <button type="button" onClick={() => dispatch({ type: 'revealNext' })}>
+              Révéler la case {view.revealIndex + 1}
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'riverDuel': {
+      const duel = view.riverDuel;
+      const waiting = duel?.pending[me];
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            Égalité de mise sur la case {(view.riverDuelSlot ?? 0) + 1}.{' '}
+            {waiting ? 'En attente de l’adversaire…' : 'Choisis une carte de ta main, face cachée.'}
+          </div>
+          <div className="phasebar__stacks">
+            <DuelStacks duel={duel} me={me} />
+          </div>
+        </div>
+      );
+    }
+
+    case 'buff':
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            {mine.buff
+              ? 'Buff placé — en attente de l’adversaire.'
+              : 'Choisis une carte de ta main : sa valeur s’ajoutera à la statistique de son signe.'}
+          </div>
+        </div>
+      );
+
+    case 'attackPlacement': {
+      const remaining = mine.attacks.filter((a) => a === null).length;
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            {mine.attacksLocked
+              ? 'Attaques figées — en attente de l’adversaire.'
+              : `Sélectionne une carte puis une case d’attaque. ${remaining} restante(s).`}
+          </div>
+          <div className="phasebar__actions">
+            <button
+              type="button"
+              disabled={mine.attacksLocked || remaining > 0}
+              onClick={() => dispatch({ type: 'lockAttacks', player: me })}
+            >
+              Valider mes attaques
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    case 'battle': {
+      const duel = view.battleDuels[view.battleIndex];
+      const tie = duel?.revealed && duel.winner === null;
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            {tie
+              ? duel.pending[me]
+                ? 'Duel supplémentaire — en attente de l’adversaire…'
+                : 'Égalité : pose une carte supplémentaire par-dessus.'
+              : `Duel ${view.battleIndex + 1} sur ${view.battleDuels.length}.`}
+          </div>
+          <div className="phasebar__actions">
+            {!duel?.revealed && (
+              <button type="button" onClick={() => dispatch({ type: 'revealBattleNext' })}>
+                Révéler le duel {view.battleIndex + 1}
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'damage':
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">
+            Les buffs sont révélés. Dégâts à appliquer :{' '}
+            {view.attacks.length === 0
+              ? 'aucun'
+              : view.attacks
+                  .map((a) => `${a.attacker} inflige ${a.value} ${SUIT_META[a.suit].glyph}`)
+                  .join(' · ')}
+          </div>
+          <div className="phasebar__actions">
+            <button type="button" onClick={() => dispatch({ type: 'applyDamage' })}>
+              Appliquer les dégâts
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'roundEnd':
+      return (
+        <div className="phasebar">
+          <div className="phasebar__hint">Aucun train éliminé. Le plateau est réinitialisé.</div>
+          <div className="phasebar__actions">
+            <button type="button" onClick={() => dispatch({ type: 'nextRound' })}>
+              Manche {view.round + 1}
+            </button>
+          </div>
+        </div>
+      );
+
+    case 'gameOver':
+      return (
+        <div className="phasebar phasebar--end">
+          <div className="phasebar__hint">
+            {view.outcome === 'draw'
+              ? 'Égalité — les deux trains sont éliminés.'
+              : view.outcome === me
+                ? 'Tu gagnes la partie.'
+                : 'Tu perds la partie.'}
+          </div>
+        </div>
+      );
+
+    default:
+      return null;
+  }
+}
+
+function DuelStacks({ duel, me }: { duel: GameState['riverDuel']; me: PlayerId }) {
+  if (!duel) return null;
+  const foe = OTHER[me];
+  return (
+    <>
+      <div className="duel__stack">
+        {duel.stacks[foe].map((c, i) => (
+          <CardView key={i} card={c} small />
+        ))}
+        {duel.pending[foe] && <CardView card={duel.pending[foe]} small />}
+      </div>
+      <span className="muted">vs</span>
+      <div className="duel__stack">
+        {duel.stacks[me].map((c, i) => (
+          <CardView key={i} card={c} small />
+        ))}
+        {duel.pending[me] && <CardView card={duel.pending[me]} small />}
+      </div>
+    </>
+  );
+}
+
+function Countdown({ deadline }: { deadline: number | null }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [deadline]);
+  if (!deadline) return null;
+  const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+  return <span className={`timer ${left <= 10 ? 'is-urgent' : ''}`}>{left}s</span>;
+}
+
+/** Only the authority fires the timeout, so it happens exactly once. */
+function useBetTimer(view: GameState, dispatch: (a: Action) => void, isAuthority: boolean) {
+  useEffect(() => {
+    if (!isAuthority || view.phase !== 'betting' || !view.betDeadline) return;
+    const delay = Math.max(0, view.betDeadline - Date.now());
+    const id = setTimeout(() => dispatch({ type: 'betTimeout' }), delay);
+    return () => clearTimeout(id);
+  }, [isAuthority, view.phase, view.betDeadline, dispatch]);
+}
+
+function LogView({ view }: { view: GameState }) {
+  const recent = view.log.slice(-6).reverse();
+  return (
+    <section className="log">
+      {recent.map((entry, i) => (
+        <div key={i} className={i === 0 ? 'log__line is-latest' : 'log__line'}>
+          <span className="muted">M{entry.round}</span> {entry.text}
+        </div>
+      ))}
+    </section>
+  );
+}
