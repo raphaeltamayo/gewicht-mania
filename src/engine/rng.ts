@@ -1,6 +1,6 @@
 /**
  * Small seeded PRNG (mulberry32). The seed lives in the game state so a whole
- * match can be replayed from its starting seed — handy when a playtest turns up
+ * match can be replayed from its starting seed, handy when a playtest turns up
  * a weird board and you want it back.
  */
 export function nextRandom(state: number): [value: number, next: number] {

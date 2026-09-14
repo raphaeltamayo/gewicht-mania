@@ -4,6 +4,7 @@ import { randomInt, shuffle } from './rng';
 import {
   OTHER,
   SUITS,
+  SUIT_META,
   isHidden,
   real,
   type Action,
@@ -50,7 +51,8 @@ export function createGame(seed: number): GameState {
   let rng = seed | 0;
   const [trainA, r1] = drawDemoTrain(rng);
   rng = r1;
-  const [trainB, r2] = drawDemoTrain(rng);
+  // The two champions must be visibly different, so B cannot roll A's name.
+  const [trainB, r2] = drawDemoTrain(rng, [trainA.name]);
   rng = r2;
 
   const state: GameState = {
@@ -117,7 +119,7 @@ function startRound(state: GameState) {
   state.phase = 'betting';
   state.betDeadline = Date.now() + RULES.betSeconds * 1000;
 
-  log(state, `Manche ${round} — ${dealCount(round)} cartes distribuées, rivière de ${RULES.riverSize}.`);
+  log(state, `Manche ${round} : ${dealCount(round)} cartes distribuées, rivière de ${RULES.riverSize}.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +133,7 @@ function popDeck(state: GameState): Card {
     state.rng = rng;
     state.deck = reshuffled;
     state.discard = [];
-    log(state, 'Pioche épuisée — la défausse est remélangée.');
+    log(state, 'Pioche épuisée : la défausse est remélangée.');
   }
   return state.deck.pop()!;
 }
@@ -149,7 +151,7 @@ function takeFromHand(state: GameState, player: PlayerId, cardId: string): Card 
 }
 
 // ---------------------------------------------------------------------------
-// Étape 2 — betting
+// Etape 2: betting
 // ---------------------------------------------------------------------------
 
 function placeBet(state: GameState, player: PlayerId, slot: number, value: number) {
@@ -178,7 +180,7 @@ function autoFillBets(state: GameState, player: PlayerId) {
   for (let i = 0; i < ps.bets.length; i++) {
     if (ps.bets[i] === null) ps.bets[i] = shuffled[k++];
   }
-  log(state, `Joueur ${player} — ${shuffled.length} mise(s) placée(s) au hasard (temps écoulé).`);
+  log(state, `Joueur ${player} : ${shuffled.length} mise(s) placée(s) au hasard (temps écoulé).`);
 }
 
 function maybeStartReveal(state: GameState) {
@@ -187,11 +189,11 @@ function maybeStartReveal(state: GameState) {
   state.phase = 'reveal';
   state.revealIndex = 0;
   state.betDeadline = null;
-  log(state, 'Phase de révélation — la rivière est évaluée de gauche à droite.');
+  log(state, 'Phase de révélation : la rivière est évaluée de gauche à droite.');
 }
 
 // ---------------------------------------------------------------------------
-// Étape 3 — reveal and river duels
+// Etape 3: reveal and river duels
 // ---------------------------------------------------------------------------
 
 function giveRiverCard(state: GameState, slotIndex: number, winner: PlayerId) {
@@ -204,7 +206,7 @@ function giveRiverCard(state: GameState, slotIndex: number, winner: PlayerId) {
 
 /**
  * Reaching the 4-card cap ends the contest immediately: every card still in the
- * river — unrevealed or contested — goes to the opponent. Because the capped
+ * river, unrevealed or contested, goes to the opponent. Because the capped
  * player holds exactly 4, the opponent always ends on 4 as well.
  */
 function awardRemainderTo(state: GameState, player: PlayerId) {
@@ -252,13 +254,13 @@ function revealNext(state: GameState) {
 
   if (betA !== null && betB !== null && betA > betB) {
     giveRiverCard(state, i, 'A');
-    log(state, `Rivière ${i + 1} : A mise ${betA} contre ${betB} — A remporte la carte.`);
+    log(state, `Rivière ${i + 1} : A mise ${betA} contre ${betB}, A remporte la carte.`);
   } else if (betA !== null && betB !== null && betB > betA) {
     giveRiverCard(state, i, 'B');
-    log(state, `Rivière ${i + 1} : B mise ${betB} contre ${betA} — B remporte la carte.`);
+    log(state, `Rivière ${i + 1} : B mise ${betB} contre ${betA}, B remporte la carte.`);
   } else {
     slot.resolution = 'contested';
-    log(state, `Rivière ${i + 1} : égalité à ${betA} — la carte reste en jeu.`);
+    log(state, `Rivière ${i + 1} : égalité à ${betA}, la carte reste en jeu.`);
   }
 
   state.revealIndex = i + 1;
@@ -369,12 +371,12 @@ function finishRiverDuel(state: GameState, duel: Duel) {
     const b = state.players.B.riverWins;
     if (a !== b) {
       giveRiverCard(state, slotIndex, a < b ? 'A' : 'B');
-      log(state, `Rivière ${slotIndex + 1} : duel nul — la carte va au joueur le moins avancé.`);
+      log(state, `Rivière ${slotIndex + 1} : duel nul, la carte va au joueur le moins avancé.`);
     } else {
       state.river[slotIndex].resolution = 'won';
       state.river[slotIndex].winner = null;
       state.discard.push(state.river[slotIndex].card);
-      log(state, `Rivière ${slotIndex + 1} : duel nul — la carte est défaussée.`);
+      log(state, `Rivière ${slotIndex + 1} : duel nul, la carte est défaussée.`);
     }
   } else if (duel.winner) {
     giveRiverCard(state, slotIndex, duel.winner);
@@ -400,7 +402,7 @@ function finishRiverDuel(state: GameState, duel: Duel) {
 }
 
 // ---------------------------------------------------------------------------
-// Étape 4 — buff, attacks, battle
+// Etape 4: buff, attacks, battle
 // ---------------------------------------------------------------------------
 
 function enterBuffPhase(state: GameState) {
@@ -409,7 +411,7 @@ function enterBuffPhase(state: GameState) {
     state.players[p].attacks = Array(attackCount(state.round)).fill(null);
     state.players[p].attacksLocked = false;
   }
-  log(state, 'Phase de duel — chaque joueur choisit sa carte de buff.');
+  log(state, 'Phase de duel : chaque joueur choisit sa carte de buff.');
 }
 
 function setBuff(state: GameState, player: PlayerId, cardId: string) {
@@ -421,7 +423,7 @@ function setBuff(state: GameState, player: PlayerId, cardId: string) {
 
   if (state.players.A.buff && state.players.B.buff) {
     state.phase = 'attackPlacement';
-    log(state, `Bataille — ${attackCount(state.round)} cartes d'attaque à placer.`);
+    log(state, `Bataille : ${attackCount(state.round)} cartes d'attaque à placer.`);
   }
 }
 
@@ -478,7 +480,7 @@ function finishBattleDuel(state: GameState, duel: Duel) {
     const attack: Attack = { attacker: duel.winner, suit: card.suit, value: card.value };
     state.attacks.push(attack);
     state.damageTaken[OTHER[duel.winner]][card.suit] += card.value;
-    log(state, `Duel ${index + 1} : ${duel.winner} l'emporte — ${card.value} sur ${card.suit}.`);
+    log(state, `Duel ${index + 1} : ${duel.winner} l'emporte, ${card.value} en ${SUIT_META[card.suit].stat}.`);
   } else {
     log(state, `Duel ${index + 1} : nul, aucune attaque.`);
   }
@@ -496,7 +498,7 @@ function finishBattleDuel(state: GameState, duel: Duel) {
   state.battleIndex = index + 1;
   if (state.battleIndex >= state.battleDuels.length) {
     state.phase = 'damage';
-    log(state, 'Tous les duels sont résolus — révélation des buffs.');
+    log(state, 'Tous les duels sont résolus : révélation des buffs.');
   }
 }
 
@@ -507,7 +509,7 @@ function applyDamage(state: GameState) {
     const ps = state.players[p];
     if (ps.buff && !isHidden(ps.buff)) {
       ps.stats[ps.buff.suit] += ps.buff.value;
-      log(state, `Buff ${p} : +${ps.buff.value} en ${ps.buff.suit}.`);
+      log(state, `Buff ${p} : +${ps.buff.value} en ${SUIT_META[ps.buff.suit].stat}.`);
     }
   }
 
@@ -522,14 +524,14 @@ function applyDamage(state: GameState) {
   if (deadA && deadB) {
     state.outcome = 'draw';
     state.phase = 'gameOver';
-    log(state, 'Les deux trains sont éliminés — égalité.');
+    log(state, 'Les deux trains sont éliminés, égalité.');
   } else if (deadA || deadB) {
     state.outcome = deadA ? 'B' : 'A';
     state.phase = 'gameOver';
-    log(state, `Le train de ${deadA ? 'A' : 'B'} est éliminé — ${state.outcome} gagne.`);
+    log(state, `Le train de ${deadA ? 'A' : 'B'} est éliminé, ${state.outcome} gagne.`);
   } else {
     state.phase = 'roundEnd';
-    log(state, 'Aucun train éliminé — nouvelle manche.');
+    log(state, 'Aucun train éliminé : nouvelle manche.');
   }
 }
 

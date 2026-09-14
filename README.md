@@ -1,4 +1,4 @@
-# Gewicht Mania — prototype
+# Gewicht Mania (prototype)
 
 Playable 2-player prototype of Gewicht Mania. Runs entirely in the browser; the
 two players connect directly to each other over WebRTC, so there is no server to
@@ -22,9 +22,9 @@ Puis <http://localhost:5173>.
 
 ## Les trois modes
 
-- **Créer une partie** — tu es le siège A, un code à 5 lettres s'affiche, tu le transmets à ton adversaire.
-- **Rejoindre** — tu entres le code, tu es le siège B.
-- **Partie locale** — un seul écran, avec un rideau quand on se passe l'appareil. Pratique pour tester les règles seul.
+- **Créer une partie** : tu es le siège A, un code à 5 lettres s'affiche, tu le transmets à ton adversaire.
+- **Rejoindre** : tu entres le code, tu es le siège B.
+- **Partie locale** : un seul écran, avec un rideau quand on se passe l'appareil. Pratique pour tester les règles seul.
 
 ## Connexion entre deux joueurs
 
@@ -35,7 +35,7 @@ navigateurs se parlent directement.
 Ça marche entre deux connexions fixes dans la très grande majorité des cas. Ça
 échoue souvent dès qu'un joueur est en 4G/5G, parce que les opérateurs mobiles
 utilisent du CGNAT symétrique où le hole punching ne passe pas. La solution est
-un relais TURN — pas besoin d'en héberger un, il y a des offres gratuites :
+un relais TURN. Pas besoin d'en héberger un, il y a des offres gratuites :
 
 1. Crée des identifiants TURN chez **Cloudflare** (dashboard → Calls → TURN keys)
    ou **Metered** (50 Go/mois gratuits).
@@ -47,19 +47,38 @@ L'écran d'accueil indique si TURN est configuré ou non.
 ## Héberger la version jouable
 
 Le dépôt peut rester **privé**. Attention : GitHub Pages sur un dépôt privé
-demande un plan payant — utilise plutôt **Cloudflare Pages** ou **Vercel**, qui
+demande un plan payant. Utilise plutôt **Cloudflare Pages** ou **Vercel**, qui
 déploient depuis un dépôt privé gratuitement.
 
 Sur Cloudflare Pages : *Connect to Git* → ce dépôt → build command `bun run build`,
 output directory `dist`. Ajoute les variables `VITE_TURN_*` dans les settings du
 projet si tu utilises TURN.
 
+## Direction artistique
+
+Tout part de la photo de TGV Duplex dans `src/assets/train.webp` : elle sert
+d'image d'accueil et de vignette sur chaque panneau de train, et les jetons de
+couleur de `styles.css` en sont tirés (bleu SNCF, argent brossé, carmin et corail
+des portes, ciel d'été, or des champs). Le dos des cartes reprend la livrée
+argent sur bleu avec la bande corail.
+
+Pour changer d'image, remplace le fichier par `src/assets/train.<jpg|png|webp>`.
+Il est résolu par un glob dans `src/ui/photo.ts`, donc l'application continue de
+fonctionner si le fichier est absent : elle affiche un bandeau de remplacement.
+
+Les icônes viennent de `lucide-react`, y compris les quatre enseignes qui servent
+aussi de statistiques de train. Aucun caractère unicode n'est utilisé comme
+icône.
+
+> La photo est un visuel de banque d'images. Vérifie la licence avant toute
+> diffusion publique du prototype.
+
 ## Architecture
 
 Trois couches, volontairement étanches :
 
 ```
-src/engine/   machine à états pure — aucune notion de React, de réseau, de timer
+src/engine/   machine à états pure, aucune notion de React, de réseau, de timer
 src/net/      transport : hot-seat local ou WebRTC. Les actions sont du JSON.
 src/ui/       rendu et interactions
 ```
@@ -71,7 +90,7 @@ src/ui/       rendu et interactions
 - **`engine/redact.ts`** retire d'un état tout ce qu'un joueur n'a pas le droit de
   voir. C'est la seule chose qui sépare un joueur de la main adverse : toute
   nouvelle information secrète doit y être traitée.
-- **`net/session.ts`** — l'hôte fait autorité, l'invité n'a qu'une vue expurgée et
+- **`net/session.ts`** : l'hôte fait autorité, l'invité n'a qu'une vue expurgée et
   envoie des actions. Comme une action est du JSON, passer à un vrai serveur plus
   tard veut dire remplacer ce fichier et rien d'autre.
 
@@ -87,7 +106,7 @@ sont configurables dans `engine/config.ts`.
 | --- | --- |
 | Sens de lecture de la rivière | Toujours de gauche à droite. |
 | Mises à égalité | La carte reste dans la rivière et n'est départagée qu'à la fin, au duel. |
-| Plafond de 4 cartes | Dès qu'un joueur atteint 4 cartes — pendant l'évaluation **ou** lors d'un duel — toutes les cartes restantes vont à l'adversaire. Le partage est donc toujours 4/4. |
+| Plafond de 4 cartes | Dès qu'un joueur atteint 4 cartes (pendant l'évaluation **ou** lors d'un duel), toutes les cartes restantes vont à l'adversaire. Le partage est donc toujours 4/4. |
 | Repioche après un duel de rivière | Immédiate, une carte par carte jouée, avant le duel suivant. |
 | Statistiques des trains | Réinitialisées à chaque manche : les dégâts ne se cumulent pas d'une manche à l'autre. La variante « les dégâts persistent » est prête, il suffit de passer `resetStatsEachRound` à `false`. |
 | Timer de mise | 60 s, et les mises non posées sont attribuées au hasard à l'expiration. |

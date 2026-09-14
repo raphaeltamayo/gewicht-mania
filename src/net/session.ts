@@ -13,7 +13,7 @@ type Message = { t: 'action'; action: Action } | { t: 'state'; state: GameState 
 const roomId = (code: string) => `gewicht-mania-${code.toLowerCase()}`;
 
 const makeCode = () => {
-  // No 0/O/1/I — these get read aloud over voice chat.
+  // No 0/O/1/I, these get read aloud over voice chat.
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 5 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 };

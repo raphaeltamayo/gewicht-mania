@@ -1,5 +1,5 @@
 /**
- * WebRTC connects the two browsers directly — no port forwarding, ever.
+ * WebRTC connects the two browsers directly, no port forwarding, ever.
  *
  * STUN alone is enough for most home connections. It is NOT enough when either
  * player is on mobile data: carriers sit behind CGNAT/symmetric NAT, where hole

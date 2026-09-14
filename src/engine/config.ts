@@ -45,7 +45,7 @@ export const RULES = {
    * damage does NOT carry over. A train must be killed within a single round.
    *
    * Flip this to false for the variant where damage persists between rounds and
-   * only the buff is stripped — worth trying once the base game feels right.
+   * only the buff is stripped, worth trying once the base game feels right.
    */
   resetStatsEachRound: true,
 

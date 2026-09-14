@@ -5,7 +5,7 @@
  *   bun run src/engine/sim.ts [games]
  *
  * This is the fastest way to check that a rules change has not broken the card
- * economy — the hand sizes in particular are load-bearing and easy to get wrong.
+ * economy, the hand sizes in particular are load-bearing and easy to get wrong.
  */
 import { RULES, attackCount, handAtDuelPhase } from './config';
 import { createGame, reduce } from './game';
@@ -170,6 +170,6 @@ for (let i = 0; i < games; i++) {
 roundCounts.sort((a, b) => a - b);
 const mean = roundCounts.reduce((a, b) => a + b, 0) / roundCounts.length;
 
-console.log(`${games} parties simulées — aucune violation d'invariant.`);
+console.log(`${games} parties simulées, aucune violation d'invariant.`);
 console.log(`Manches : min ${roundCounts[0]}, médiane ${roundCounts[Math.floor(roundCounts.length / 2)]}, moyenne ${mean.toFixed(2)}, max ${roundCounts.at(-1)}`);
 console.log(`Issues  : A ${outcomes.A}, B ${outcomes.B}, égalité ${outcomes.draw}`);

@@ -11,11 +11,12 @@ export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
 
 export const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 
-export const SUIT_META: Record<Suit, { glyph: string; stat: string; unit: string }> = {
-  hearts: { glyph: '♥', stat: 'Longueur', unit: 'm' },
-  diamonds: { glyph: '♦', stat: 'Poids', unit: 't' },
-  clubs: { glyph: '♣', stat: 'Énergie', unit: 'kW' },
-  spades: { glyph: '♠', stat: 'Vitesse', unit: 'km/h' },
+/** Icons live in the UI layer; the engine only names the stat. */
+export const SUIT_META: Record<Suit, { stat: string; unit: string }> = {
+  hearts: { stat: 'Longueur', unit: 'm' },
+  diamonds: { stat: 'Poids', unit: 't' },
+  clubs: { stat: 'Énergie', unit: 'kW' },
+  spades: { stat: 'Vitesse', unit: 'km/h' },
 };
 
 export type PlayerId = 'A' | 'B';
@@ -102,19 +103,19 @@ export type PlayerState = {
 
 export type Phase =
   | 'lobby'
-  /** Étape 2 — both players place their 8 bet cards under a timer. */
+  /** Étape 2, both players place their 8 bet cards under a timer. */
   | 'betting'
-  /** Étape 3a — walking the river left to right comparing bets. */
+  /** Étape 3a, walking the river left to right comparing bets. */
   | 'reveal'
-  /** Étape 3b — face-down duels over the slots where bets tied. */
+  /** Étape 3b, face-down duels over the slots where bets tied. */
   | 'riverDuel'
-  /** Étape 4a — each player commits one face-down buff card. */
+  /** Étape 4a, each player commits one face-down buff card. */
   | 'buff'
-  /** Étape 4b — each player commits their attack cards face down. */
+  /** Étape 4b, each player commits their attack cards face down. */
   | 'attackPlacement'
-  /** Étape 4c — flipping the attack pairs one at a time. */
+  /** Étape 4c, flipping the attack pairs one at a time. */
   | 'battle'
-  /** Étape 4d — buffs revealed, damage applied. */
+  /** Étape 4d, buffs revealed, damage applied. */
   | 'damage'
   | 'roundEnd'
   | 'gameOver';
@@ -142,7 +143,7 @@ export type GameState = {
   battleIndex: number;
   battleDuels: Duel[];
   attacks: Attack[];
-  /** Damage taken, per player, per stat — applied all at once in `damage`. */
+  /** Damage taken, per player, per stat, applied all at once in `damage`. */
   damageTaken: Record<PlayerId, Stats>;
 
   log: LogEntry[];

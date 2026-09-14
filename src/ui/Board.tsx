@@ -11,19 +11,20 @@ import {
   type PlayerId,
 } from '../engine/types';
 import type { Session } from '../net/session';
+import { Hourglass, Lock, SuitIcon, Swords, Users, Zap } from './icons';
 import { BetChip, CardView, TrainPanel } from './pieces';
 
 const asCard = (c: AnyCard | null): Card | null => (c && !isHidden(c) ? c : null);
 
 const PHASE_TITLE: Record<GameState['phase'], string> = {
   lobby: 'En attente',
-  betting: 'Étape 2 — Phase de réflexion',
-  reveal: 'Étape 3 — Phase de révélation',
-  riverDuel: 'Étape 3 — Duels de rivière',
-  buff: 'Étape 4 — Buff',
-  attackPlacement: 'Étape 4 — Placement des attaques',
-  battle: 'Étape 4 — Bataille',
-  damage: 'Étape 4 — Dégâts',
+  betting: 'Étape 2 : phase de réflexion',
+  reveal: 'Étape 3 : phase de révélation',
+  riverDuel: 'Étape 3 : duels de rivière',
+  buff: 'Étape 4 : buff',
+  attackPlacement: 'Étape 4 : placement des attaques',
+  battle: 'Étape 4 : bataille',
+  damage: 'Étape 4 : dégâts',
   roundEnd: 'Fin de manche',
   gameOver: 'Partie terminée',
 };
@@ -102,9 +103,10 @@ export function Board({ session }: { session: Session }) {
     <div className="board">
       <Header session={session} />
 
-      <TrainPanel player={theirs} label={`Adversaire (${foe})`} stats={theirs.stats} />
+      <TrainPanel player={theirs} label={`Adversaire (${foe})`} stats={theirs.stats} tone={foe === 'A' ? 'a' : 'b'} />
 
       <div className="opp-hand">
+        <Users size={14} />
         <span>Main adverse</span>
         <div className="opp-hand__cards">
           {theirs.hand.map((c, i) => (
@@ -115,7 +117,7 @@ export function Board({ session }: { session: Session }) {
 
       {riverStage ? (
         <section className="river">
-          <div className="river__row river__row--bets">
+          <div className="river__row">
             {theirs.bets.map((b, i) => (
               <BetChip key={i} value={b} hidden={b === null && view.phase !== 'betting'} />
             ))}
@@ -128,20 +130,20 @@ export function Board({ session }: { session: Session }) {
               return (
                 <div
                   key={i}
-                  className={`slot ${slot.resolution === 'won' ? `is-won is-won--${slot.winner ?? 'none'}` : ''} ${
-                    contested ? 'is-contested' : ''
-                  } ${duelHere ? 'is-active' : ''} ${view.phase === 'reveal' && i === view.revealIndex ? 'is-next' : ''}`}
+                  className={`slot ${slot.resolution === 'won' ? 'is-won' : ''} ${contested ? 'is-contested' : ''} ${
+                    duelHere ? 'is-active' : ''
+                  } ${view.phase === 'reveal' && i === view.revealIndex ? 'is-next' : ''}`}
                   onClick={() => onRiverSlot(i)}
                 >
                   <CardView card={slot.card} muted={slot.resolution === 'won'} />
-                  {slot.resolution === 'won' && <span className="slot__tag">{slot.winner ?? '—'}</span>}
+                  {slot.resolution === 'won' && <span className="slot__tag">{slot.winner ?? '.'}</span>}
                   {contested && <span className="slot__tag slot__tag--tie">=</span>}
                 </div>
               );
             })}
           </div>
 
-          <div className="river__row river__row--bets">
+          <div className="river__row">
             {mine.bets.map((b, i) => (
               <BetChip key={i} value={b} onClick={() => onRiverSlot(i)} />
             ))}
@@ -151,7 +153,7 @@ export function Board({ session }: { session: Session }) {
         <BattleStage view={view} me={me} onAttackSlot={onAttackSlot} />
       )}
 
-      <TrainPanel player={mine} label={`Toi (${me})`} stats={mine.stats} />
+      <TrainPanel player={mine} label={`Toi (${me})`} stats={mine.stats} tone={me === 'A' ? 'a' : 'b'} />
 
       <PhaseBar
         view={view}
@@ -163,9 +165,7 @@ export function Board({ session }: { session: Session }) {
       />
 
       <section className="hand">
-        <div className="hand__label">
-          Ta main <span className="muted">({mine.hand.length})</span>
-        </div>
+        <div className="hand__label">Ta main ({mine.hand.length})</div>
         <div className="hand__cards">
           {mine.hand.map((c, i) => {
             const card = asCard(c);
@@ -193,16 +193,16 @@ export function Board({ session }: { session: Session }) {
               session.switchSeat(foe);
             }}
           >
-            Passer la main au joueur {foe}
+            <Users size={15} /> Passer la main au joueur {foe}
           </button>
         </div>
       )}
 
       {curtain && (
         <div className="curtain">
-          <p>Passe l'appareil au joueur {me}.</p>
-          <button type="button" onClick={() => setCurtain(false)}>
-            Je suis {me} — afficher
+          <p>Passe l&apos;appareil au joueur {me}.</p>
+          <button type="button" className="primary" onClick={() => setCurtain(false)}>
+            Je suis {me}, afficher le plateau
           </button>
         </div>
       )}
@@ -221,7 +221,7 @@ function Header({ session }: { session: Session }) {
   const statusText: Record<string, string> = {
     idle: '',
     waiting: 'en attente du second joueur',
-    connecting: 'connexion…',
+    connecting: 'connexion en cours',
     connected: 'connecté',
     disconnected: 'déconnecté',
     error: `erreur : ${session.error}`,
@@ -273,7 +273,11 @@ function BattleStage({
           return (
             <div key={i} className={`duel ${active ? 'is-active' : ''} ${duel?.winner ? `won-${duel.winner}` : ''}`}>
               <div className="duel__stack">
-                {stackFoe.length ? stackFoe.map((c, k) => <CardView key={k} card={c} small />) : <CardView card={null} small />}
+                {stackFoe.length ? (
+                  stackFoe.map((c, k) => <CardView key={k} card={c} small />)
+                ) : (
+                  <CardView card={null} small />
+                )}
               </div>
               <div className="duel__verdict">
                 {duel?.winner === 'draw' ? 'nul' : duel?.winner ? (duel.winner === me ? 'gagné' : 'perdu') : `#${i + 1}`}
@@ -294,13 +298,14 @@ function BattleStage({
 }
 
 function BuffSlot({ label, card }: { label: string; card: AnyCard | null }) {
+  const real = asCard(card);
   return (
     <div className="buffslot">
       <span className="muted">{label}</span>
       <CardView card={card} small />
-      {asCard(card) && (
+      {real && (
         <span className="buffslot__effect">
-          +{asCard(card)!.value} {SUIT_META[asCard(card)!.suit].stat}
+          <Zap size={13} />+{real.value} {SUIT_META[real.suit].stat}
         </span>
       )}
     </div>
@@ -330,14 +335,23 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
-            {mine.betsLocked
-              ? 'Mises figées — en attente de l’adversaire.'
-              : 'Choisis une mise, puis clique la case sous la carte de rivière.'}
+            {mine.betsLocked ? (
+              <>
+                <Lock size={15} /> Mises figées, en attente de l&apos;adversaire.
+              </>
+            ) : (
+              'Choisis une mise, puis clique la case sous la carte de rivière.'
+            )}
           </div>
           {!mine.betsLocked && (
             <div className="bettray">
               {unplacedBets.map((v) => (
-                <BetChip key={v} value={v} selected={selectedBet === v} onClick={() => setSelectedBet(selectedBet === v ? null : v)} />
+                <BetChip
+                  key={v}
+                  value={v}
+                  selected={selectedBet === v}
+                  onClick={() => setSelectedBet(selectedBet === v ? null : v)}
+                />
               ))}
             </div>
           )}
@@ -345,10 +359,11 @@ function PhaseBar({
             <Countdown deadline={view.betDeadline} />
             <button
               type="button"
+              className="primary"
               disabled={mine.betsLocked || mine.bets.some((b) => b === null)}
               onClick={() => dispatch({ type: 'lockBets', player: me })}
             >
-              Valider mes mises
+              <Lock size={15} /> Valider mes mises
             </button>
           </div>
         </div>
@@ -358,10 +373,10 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
-            Cartes remportées — toi {mine.riverWins} / adversaire {theirs.riverWins}
+            Cartes remportées : toi {mine.riverWins}, adversaire {theirs.riverWins}
           </div>
           <div className="phasebar__actions">
-            <button type="button" onClick={() => dispatch({ type: 'revealNext' })}>
+            <button type="button" className="primary" onClick={() => dispatch({ type: 'revealNext' })}>
               Révéler la case {view.revealIndex + 1}
             </button>
           </div>
@@ -374,8 +389,9 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
+            <Swords size={15} />
             Égalité de mise sur la case {(view.riverDuelSlot ?? 0) + 1}.{' '}
-            {waiting ? 'En attente de l’adversaire…' : 'Choisis une carte de ta main, face cachée.'}
+            {waiting ? 'En attente de l’adversaire.' : 'Choisis une carte de ta main, face cachée.'}
           </div>
           <div className="phasebar__stacks">
             <DuelStacks duel={duel} me={me} />
@@ -388,8 +404,9 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
+            <Zap size={15} />
             {mine.buff
-              ? 'Buff placé — en attente de l’adversaire.'
+              ? 'Buff placé, en attente de l’adversaire.'
               : 'Choisis une carte de ta main : sa valeur s’ajoutera à la statistique de son signe.'}
           </div>
         </div>
@@ -400,17 +417,19 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
+            <Swords size={15} />
             {mine.attacksLocked
-              ? 'Attaques figées — en attente de l’adversaire.'
+              ? 'Attaques figées, en attente de l’adversaire.'
               : `Sélectionne une carte puis une case d’attaque. ${remaining} restante(s).`}
           </div>
           <div className="phasebar__actions">
             <button
               type="button"
+              className="primary"
               disabled={mine.attacksLocked || remaining > 0}
               onClick={() => dispatch({ type: 'lockAttacks', player: me })}
             >
-              Valider mes attaques
+              <Lock size={15} /> Valider mes attaques
             </button>
           </div>
         </div>
@@ -423,15 +442,16 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
+            <Swords size={15} />
             {tie
               ? duel.pending[me]
-                ? 'Duel supplémentaire — en attente de l’adversaire…'
+                ? 'Duel supplémentaire, en attente de l’adversaire.'
                 : 'Égalité : pose une carte supplémentaire par-dessus.'
               : `Duel ${view.battleIndex + 1} sur ${view.battleDuels.length}.`}
           </div>
           <div className="phasebar__actions">
             {!duel?.revealed && (
-              <button type="button" onClick={() => dispatch({ type: 'revealBattleNext' })}>
+              <button type="button" className="primary" onClick={() => dispatch({ type: 'revealBattleNext' })}>
                 Révéler le duel {view.battleIndex + 1}
               </button>
             )}
@@ -444,15 +464,19 @@ function PhaseBar({
       return (
         <div className="phasebar">
           <div className="phasebar__hint">
-            Les buffs sont révélés. Dégâts à appliquer :{' '}
-            {view.attacks.length === 0
-              ? 'aucun'
-              : view.attacks
-                  .map((a) => `${a.attacker} inflige ${a.value} ${SUIT_META[a.suit].glyph}`)
-                  .join(' · ')}
+            <span>Buffs révélés. Dégâts à appliquer :</span>
+            {view.attacks.length === 0 ? (
+              <span>aucun</span>
+            ) : (
+              view.attacks.map((a, i) => (
+                <span key={i} className="damage-chip">
+                  {a.attacker} inflige {a.value} <SuitIcon suit={a.suit} size={13} />
+                </span>
+              ))
+            )}
           </div>
           <div className="phasebar__actions">
-            <button type="button" onClick={() => dispatch({ type: 'applyDamage' })}>
+            <button type="button" className="primary" onClick={() => dispatch({ type: 'applyDamage' })}>
               Appliquer les dégâts
             </button>
           </div>
@@ -464,7 +488,7 @@ function PhaseBar({
         <div className="phasebar">
           <div className="phasebar__hint">Aucun train éliminé. Le plateau est réinitialisé.</div>
           <div className="phasebar__actions">
-            <button type="button" onClick={() => dispatch({ type: 'nextRound' })}>
+            <button type="button" className="primary" onClick={() => dispatch({ type: 'nextRound' })}>
               Manche {view.round + 1}
             </button>
           </div>
@@ -476,7 +500,7 @@ function PhaseBar({
         <div className="phasebar phasebar--end">
           <div className="phasebar__hint">
             {view.outcome === 'draw'
-              ? 'Égalité — les deux trains sont éliminés.'
+              ? 'Égalité, les deux trains sont éliminés.'
               : view.outcome === me
                 ? 'Tu gagnes la partie.'
                 : 'Tu perds la partie.'}
@@ -520,7 +544,12 @@ function Countdown({ deadline }: { deadline: number | null }) {
   }, [deadline]);
   if (!deadline) return null;
   const left = Math.max(0, Math.ceil((deadline - now) / 1000));
-  return <span className={`timer ${left <= 10 ? 'is-urgent' : ''}`}>{left}s</span>;
+  return (
+    <span className={`timer ${left <= 10 ? 'is-urgent' : ''}`}>
+      <Hourglass size={14} />
+      {left}s
+    </span>
+  );
 }
 
 /** Only the authority fires the timeout, so it happens exactly once. */
