@@ -562,6 +562,37 @@ code {
   padding: 0;
   font-variant-numeric: tabular-nums;
 }
+/*
+ * The fill is what makes a bet readable at a glance: height is the value as a
+ * fraction of 8, so two chips can be compared without reading either digit.
+ * --fill and --ink are set per chip in BetChip.
+ */
+.bet--filled {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+.bet--filled::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--fill, 0%);
+  background: hsl(217 68% var(--ink, 50%));
+}
+.bet__value {
+  position: relative;
+  /* Sits on white at the bottom of the scale and on deep blue at the top, so
+     the digit needs a colour that survives both: it follows the fill. */
+  color: var(--blue-900);
+  mix-blend-mode: normal;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.bet--filled.is-strong .bet__value {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
 .bet--empty {
   border-style: dashed;
   background: rgba(255, 255, 255, 0.5);
@@ -705,6 +736,43 @@ code {
   border-color: var(--gold);
   background: #fdf6e4;
 }
+/* Result screens: the board pauses here, so they read as a card, not a hint. */
+.phasebar--result {
+  background: #fff;
+  border-color: var(--silver-300);
+}
+.phasebar--result.is-win {
+  border-color: #2f7d4f;
+  background: #f0faf3;
+}
+.phasebar--result.is-loss {
+  border-color: var(--carmine);
+  background: #fdf1f3;
+}
+.recap__log {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* A whole number of 17.4px lines, so the list never ends on a half-clipped one. */
+  max-height: 88px;
+  overflow-y: auto;
+}
+
+.topbar__exit {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 4px 8px;
+  min-height: 0;
+}
+.topbar__exit.is-confirming {
+  background: var(--carmine);
+  border-color: var(--carmine);
+  color: #fff;
+  font-size: 12px;
+}
 .phasebar__hint {
   color: var(--blue-900);
   display: flex;
@@ -844,6 +912,11 @@ code {
   .battle {
     padding: 7px;
     gap: 4px;
+  }
+  /* Three log lines instead of five, so the recap does not push the river
+     itself out of view on a short screen. */
+  .recap__log {
+    max-height: 53px;
   }
 }
 

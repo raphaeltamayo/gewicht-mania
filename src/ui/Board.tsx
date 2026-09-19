@@ -11,7 +11,7 @@ import {
   type PlayerId,
 } from '../engine/types';
 import type { Session } from '../net/session';
-import { Bot, Hourglass, Lock, SuitIcon, Swords, Users, Zap } from './icons';
+import { Bot, Home, Hourglass, Lock, RotateCcw, Shuffle, SuitIcon, Swords, Users, Zap } from './icons';
 import { BetChip, CardView, TrainPanel } from './pieces';
 
 const asCard = (c: AnyCard | null): Card | null => (c && !isHidden(c) ? c : null);
@@ -22,6 +22,8 @@ const PHASE_TITLE: Record<GameState['phase'], string> = {
   betting: 'É2 réflexion',
   reveal: 'É3 révélation',
   riverDuel: 'É3 duels',
+  riverDuelResult: 'É3 résultat',
+  riverRecap: 'É3 bilan',
   buff: 'É4 buff',
   attackPlacement: 'É4 attaques',
   battle: 'É4 bataille',
@@ -30,7 +32,7 @@ const PHASE_TITLE: Record<GameState['phase'], string> = {
   gameOver: 'Terminé',
 };
 
-export function Board({ session }: { session: Session }) {
+export function Board({ session, onExit }: { session: Session; onExit: () => void }) {
   const view = session.view!;
   const me = session.seat;
   const foe = OTHER[me];
@@ -104,11 +106,16 @@ export function Board({ session }: { session: Session }) {
       ? () => dispatch({ type: 'clearBuff', player: me })
       : undefined;
 
-  const riverStage = view.phase === 'betting' || view.phase === 'reveal' || view.phase === 'riverDuel';
+  const riverStage =
+    view.phase === 'betting' ||
+    view.phase === 'reveal' ||
+    view.phase === 'riverDuel' ||
+    view.phase === 'riverDuelResult' ||
+    view.phase === 'riverRecap';
 
   return (
     <div className="board">
-      <Header session={session} />
+      <Header session={session} onExit={onExit} />
 
       <TrainPanel
         player={theirs}
@@ -157,7 +164,9 @@ export function Board({ session }: { session: Session }) {
           <BattleStage view={view} me={me} onAttackSlot={onAttackSlot} onClearBuff={onClearBuff} />
         )}
 
-        <LogView view={view} />
+        {/* The recap lists this round's log itself, so showing it twice would
+            just squeeze the river out of the stage. */}
+        {view.phase !== 'riverRecap' && <LogView view={view} />}
       </main>
 
       <TrainPanel
@@ -175,6 +184,8 @@ export function Board({ session }: { session: Session }) {
         unplacedBets={unplacedBets}
         selectedBet={selectedBet}
         setSelectedBet={setSelectedBet}
+        onExit={onExit}
+        onRestart={session.mode === 'guest' ? undefined : () => session.restart()}
       />
 
       <section className="hand">
@@ -226,8 +237,16 @@ function handIsClickable(phase: GameState['phase']) {
   return phase === 'buff' || phase === 'attackPlacement' || phase === 'riverDuel' || phase === 'battle';
 }
 
-function Header({ session }: { session: Session }) {
+function Header({ session, onExit }: { session: Session; onExit: () => void }) {
   const view = session.view!;
+  // Two-step, because a stray tap on the top bar should not bin a live game.
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const id = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirming]);
+
   const statusText: Record<string, string> = {
     idle: '',
     waiting: 'en attente du second joueur',
@@ -254,6 +273,14 @@ function Header({ session }: { session: Session }) {
           </span>
         )}
         <span className="pill">Siège {session.seat}</span>
+        <button
+          type="button"
+          className={`topbar__exit ${confirming ? 'is-confirming' : ''}`}
+          title="Retour au menu"
+          onClick={() => (confirming ? onExit() : setConfirming(true))}
+        >
+          {confirming ? 'Quitter ?' : <Home size={15} />}
+        </button>
       </div>
     </header>
   );
@@ -337,6 +364,8 @@ function PhaseBar({
   unplacedBets,
   selectedBet,
   setSelectedBet,
+  onExit,
+  onRestart,
 }: {
   view: GameState;
   me: PlayerId;
@@ -344,6 +373,8 @@ function PhaseBar({
   unplacedBets: number[];
   selectedBet: number | null;
   setSelectedBet: (v: number | null) => void;
+  onExit: () => void;
+  onRestart?: () => void;
 }) {
   const mine = view.players[me];
   const theirs = view.players[OTHER[me]];
@@ -377,11 +408,18 @@ function PhaseBar({
             <Countdown deadline={view.betDeadline} />
             <button
               type="button"
+              disabled={mine.betsLocked || !mine.bets.some((b) => b === null)}
+              onClick={() => dispatch({ type: 'fillBets', player: me })}
+            >
+              <Shuffle size={15} /> Compléter au hasard
+            </button>
+            <button
+              type="button"
               className="primary"
               disabled={mine.betsLocked || mine.bets.some((b) => b === null)}
               onClick={() => dispatch({ type: 'lockBets', player: me })}
             >
-              <Lock size={15} /> Valider mes mises
+              <Lock size={15} /> Valider
             </button>
           </div>
         </div>
@@ -413,6 +451,67 @@ function PhaseBar({
           </div>
           <div className="phasebar__stacks">
             <DuelStacks duel={duel} me={me} />
+          </div>
+        </div>
+      );
+    }
+
+    case 'riverDuelResult': {
+      const duel = view.riverDuel;
+      const slot = (view.riverDuelSlot ?? 0) + 1;
+      const won = duel?.winner === me;
+      const drawn = duel?.winner === 'draw';
+      return (
+        <div className={`phasebar phasebar--result ${won ? 'is-win' : drawn ? '' : 'is-loss'}`}>
+          <div className="phasebar__hint">
+            <Swords size={15} />
+            <strong>
+              {drawn ? `Case ${slot} : duel nul.` : won ? `Tu remportes la case ${slot}.` : `L’adversaire remporte la case ${slot}.`}
+            </strong>
+          </div>
+          <div className="phasebar__hint">
+            <DuelStacks duel={duel} me={me} />
+          </div>
+          <div className="phasebar__actions">
+            <span className="muted">
+              Cartes : toi {mine.riverWins}, adversaire {theirs.riverWins}
+            </span>
+            <button type="button" className="primary" onClick={() => dispatch({ type: 'acknowledge' })}>
+              Continuer
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    case 'riverRecap': {
+      const mineWon = view.river.filter((s) => s.winner === me).length;
+      const theirsWon = view.river.filter((s) => s.winner === OTHER[me]).length;
+      const discarded = view.river.filter((s) => s.resolution === 'won' && s.winner === null).length;
+      return (
+        <div className="phasebar phasebar--result">
+          <div className="phasebar__hint">
+            <strong>Bilan de la rivière</strong>
+          </div>
+          <div className="phasebar__hint">
+            <span className="damage-chip">Toi {mineWon}</span>
+            <span className="damage-chip">Adversaire {theirsWon}</span>
+            {discarded > 0 && <span className="damage-chip">Défaussées {discarded}</span>}
+          </div>
+          {/* The whole round's Étape 3, so a cap award or a duel resolved in the
+              same tick is still readable here rather than having flashed past. */}
+          <div className="recap__log">
+            {view.log
+              .filter((l) => l.round === view.round)
+              .slice(-5)
+              .map((l, i) => (
+                <div key={i}>{l.text}</div>
+              ))}
+          </div>
+          <div className="phasebar__actions">
+            <button type="button" className="primary" onClick={() => dispatch({ type: 'acknowledge' })}>
+              Passer à l’étape 4
+            </button>
           </div>
         </div>
       );
@@ -529,11 +628,23 @@ function PhaseBar({
       return (
         <div className="phasebar phasebar--end">
           <div className="phasebar__hint">
-            {view.outcome === 'draw'
-              ? 'Égalité, les deux trains sont éliminés.'
-              : view.outcome === me
-                ? 'Tu gagnes la partie.'
-                : 'Tu perds la partie.'}
+            <strong>
+              {view.outcome === 'draw'
+                ? 'Égalité, les deux trains sont éliminés.'
+                : view.outcome === me
+                  ? 'Tu gagnes la partie.'
+                  : 'Tu perds la partie.'}
+            </strong>
+          </div>
+          <div className="phasebar__actions">
+            {onRestart && (
+              <button type="button" className="primary" onClick={onRestart}>
+                <RotateCcw size={15} /> Rejouer
+              </button>
+            )}
+            <button type="button" onClick={onExit}>
+              <Home size={15} /> Menu principal
+            </button>
           </div>
         </div>
       );
@@ -593,7 +704,7 @@ function useBetTimer(view: GameState, dispatch: (a: Action) => void, isAuthority
 }
 
 function LogView({ view }: { view: GameState }) {
-  const recent = view.log.slice(-6).reverse();
+  const recent = view.log.slice(-3).reverse();
   return (
     <section className="log">
       {recent.map((entry, i) => (

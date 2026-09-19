@@ -26,4 +26,4 @@ export function SuitIcon({ suit, size = 16, className }: { suit: Suit; size?: nu
   );
 }
 
-export { Bot, Hourglass, Layers, Lock, Swords, TrainFront, Users, Zap } from 'lucide-react';
+export { Bot, Home, Hourglass, Layers, Lock, RotateCcw, Shuffle, Swords, TrainFront, Users, Zap } from 'lucide-react';

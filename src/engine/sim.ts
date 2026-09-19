@@ -45,6 +45,10 @@ function nextActions(s: GameState, rand: () => number): Action[] {
     case 'reveal':
       return [{ type: 'revealNext' }];
 
+    case 'riverDuelResult':
+    case 'riverRecap':
+      return [{ type: 'acknowledge' }];
+
     case 'riverDuel': {
       const duel = s.riverDuel!;
       return PLAYERS.filter((p) => !duel.pending[p] && handIds(s, p).length > 0).map((p) => ({

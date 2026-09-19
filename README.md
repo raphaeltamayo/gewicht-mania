@@ -45,6 +45,18 @@ duels, appliquer les dégâts) restent tes boutons, comme en hot-seat.
 ## Interface
 
 - Le minuteur de l'étape 2 est à **2 minutes** (`RULES.betSeconds`).
+- Les jetons de mise sont **remplis proportionnellement à leur valeur** : un 1 est
+  un filet, un 8 est plein. Comparer deux mises se fait en regardant les barres,
+  pas en lisant puis classant deux chiffres.
+- **Compléter au hasard** remplit les cases vides avec les mises qu'il te reste,
+  sans toucher à celles que tu as déjà posées.
+- **Rien ne se résout hors écran.** Chaque duel de rivière s'arrête sur son
+  résultat, et un bilan de rivière précède l'étape 4. Avant, un duel qui poussait
+  un joueur au plafond de 4 cartes donnait tout le reste de la rivière à
+  l'adversaire entre deux images : personne ne voyait ce qu'il avait gagné.
+- Le bouton maison en haut à droite ramène au menu (deux touches, pour qu'un
+  appui parasite ne jette pas une partie en cours). L'écran de fin propose
+  **Rejouer** et **Menu principal**.
 - **Toute carte posée se reprend en la touchant** : une mise sur la rivière, une
   carte d'attaque, ou le buff. Le buff se valide maintenant explicitement, comme
   les mises et les attaques — sans ça, la phase basculait dès que l'adversaire

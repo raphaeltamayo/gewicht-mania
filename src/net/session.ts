@@ -211,6 +211,29 @@ export class Session {
     this.publish();
   }
 
+  /**
+   * Tear the current game down and go back to a fresh lobby state. Unlike
+   * `destroy`, the session object stays usable: the listeners survive, so the
+   * same Session can host or join again.
+   */
+  leave() {
+    if (this.botTimer) clearTimeout(this.botTimer);
+    this.botTimer = null;
+    this.conn?.close();
+    this.peer?.destroy();
+    this.conn = null;
+    this.peer = null;
+
+    this.mode = 'local';
+    this.seat = 'A';
+    this.status = 'idle';
+    this.code = '';
+    this.error = '';
+    this.view = null;
+    this.authoritative = null;
+    this.emit();
+  }
+
   destroy() {
     if (this.botTimer) clearTimeout(this.botTimer);
     this.botTimer = null;
@@ -235,6 +258,7 @@ function forceSeat(action: Action, seat: PlayerId): Action | null {
     case 'applyDamage':
     case 'nextRound':
     case 'betTimeout':
+    case 'acknowledge':
       return action;
     default:
       return null;

@@ -35,9 +35,26 @@ export default function App() {
           )}
         </p>
         {session.status === 'error' && <p className="error">{session.error}</p>}
+        <button
+          type="button"
+          onClick={() => {
+            session.leave();
+            setStarted(false);
+          }}
+        >
+          Retour au menu
+        </button>
       </div>
     );
   }
 
-  return <Board session={session} />;
+  return (
+    <Board
+      session={session}
+      onExit={() => {
+        session.leave();
+        setStarted(false);
+      }}
+    />
+  );
 }

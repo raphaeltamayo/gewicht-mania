@@ -111,6 +111,10 @@ export type Phase =
   | 'reveal'
   /** Étape 3b, face-down duels over the slots where bets tied. */
   | 'riverDuel'
+  /** A duel has been settled and stays on screen until the players move on. */
+  | 'riverDuelResult'
+  /** Recap of the whole river before Étape 4, so nothing is resolved off-screen. */
+  | 'riverRecap'
   /** Étape 4a, each player commits one face-down buff card. */
   | 'buff'
   /** Étape 4b, each player commits their attack cards face down. */
@@ -157,7 +161,11 @@ export type Action =
   | { type: 'placeBet'; player: PlayerId; slot: number; value: number }
   | { type: 'clearBet'; player: PlayerId; slot: number }
   | { type: 'lockBets'; player: PlayerId }
+  /** Fill this player's empty slots at random from their unused bet cards. */
+  | { type: 'fillBets'; player: PlayerId }
   | { type: 'betTimeout' }
+  /** Dismiss a result screen (`riverDuelResult`, `riverRecap`) and carry on. */
+  | { type: 'acknowledge' }
   | { type: 'revealNext' }
   | { type: 'commitDuelCard'; player: PlayerId; cardId: string }
   | { type: 'revealDuel' }

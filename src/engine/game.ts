@@ -170,7 +170,7 @@ function placeBet(state: GameState, player: PlayerId, slot: number, value: numbe
   ps.bets[slot] = value;
 }
 
-function autoFillBets(state: GameState, player: PlayerId) {
+function autoFillBets(state: GameState, player: PlayerId, reason = 'au hasard') {
   const ps = state.players[player];
   const unused: number[] = [];
   for (let v = 1; v <= RULES.betMax; v++) if (!ps.bets.includes(v)) unused.push(v);
@@ -182,7 +182,7 @@ function autoFillBets(state: GameState, player: PlayerId) {
   for (let i = 0; i < ps.bets.length; i++) {
     if (ps.bets[i] === null) ps.bets[i] = shuffled[k++];
   }
-  log(state, `Joueur ${player} : ${shuffled.length} mise(s) placée(s) au hasard (temps écoulé).`);
+  log(state, `Joueur ${player} : ${shuffled.length} mise(s) placée(s) ${reason}.`);
 }
 
 function maybeStartReveal(state: GameState) {
@@ -225,7 +225,21 @@ function awardRemainderTo(state: GameState, player: PlayerId) {
   if (given > 0) log(state, `Joueur ${player} récupère les ${given} carte(s) restantes de la rivière.`);
   state.riverDuel = null;
   state.riverDuelSlot = null;
-  enterBuffPhase(state);
+  enterRiverRecap(state);
+}
+
+/**
+ * A beat between Étape 3 and Étape 4.
+ *
+ * Without it the board could jump from "place your duel card" straight to the
+ * buff phase: a duel resolving can push a player to the 4-card cap, which hands
+ * the whole rest of the river to the opponent at once. All of that used to
+ * happen between two frames, so nobody ever saw what they had won.
+ */
+function enterRiverRecap(state: GameState) {
+  state.phase = 'riverRecap';
+  state.riverDuel = null;
+  state.riverDuelSlot = null;
 }
 
 function contestedSlots(state: GameState): number[] {
@@ -280,7 +294,7 @@ function revealNext(state: GameState) {
 function startRiverDuels(state: GameState) {
   const contested = contestedSlots(state);
   if (contested.length === 0) {
-    enterBuffPhase(state);
+    enterRiverRecap(state);
     return;
   }
   state.phase = 'riverDuel';
@@ -292,11 +306,10 @@ function startRiverDuels(state: GameState) {
 function advanceRiverDuel(state: GameState) {
   const contested = contestedSlots(state);
   if (contested.length === 0) {
-    state.riverDuel = null;
-    state.riverDuelSlot = null;
-    enterBuffPhase(state);
+    enterRiverRecap(state);
     return;
   }
+  state.phase = 'riverDuel';
   state.riverDuelSlot = contested[0];
   state.riverDuel = newDuel();
 }
@@ -394,6 +407,14 @@ function finishRiverDuel(state: GameState, duel: Duel) {
     for (const p of PLAYERS) drawTo(state, p, played);
   }
 
+  // Stop here and leave the settled duel on the board. What happens next — the
+  // next duel, or the cap handing the rest of the river to one player — only
+  // runs once the players acknowledge this result.
+  state.phase = 'riverDuelResult';
+}
+
+/** Leave `riverDuelResult`: apply the cap rule, then move to the next duel. */
+function resumeAfterRiverDuel(state: GameState) {
   for (const p of PLAYERS) {
     if (state.players[p].riverWins >= RULES.riverCap) {
       awardRemainderTo(state, OTHER[p]);
@@ -594,11 +615,24 @@ export function reduce(prev: GameState, action: Action): GameState {
       break;
     }
 
+    case 'fillBets': {
+      if (state.phase !== 'betting') break;
+      if (state.players[action.player].betsLocked) break;
+      autoFillBets(state, action.player);
+      break;
+    }
+
+    case 'acknowledge': {
+      if (state.phase === 'riverDuelResult') resumeAfterRiverDuel(state);
+      else if (state.phase === 'riverRecap') enterBuffPhase(state);
+      break;
+    }
+
     case 'betTimeout': {
       if (state.phase !== 'betting') break;
       for (const p of PLAYERS) {
         if (!state.players[p].betsLocked) {
-          if (RULES.autoFillBetsOnTimeout) autoFillBets(state, p);
+          if (RULES.autoFillBetsOnTimeout) autoFillBets(state, p, 'au hasard (temps écoulé)');
           state.players[p].betsLocked = true;
         }
       }
