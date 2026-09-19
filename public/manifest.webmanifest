@@ -1,0 +1,17 @@
+{
+  "name": "Gewicht Mania",
+  "short_name": "Gewicht",
+  "description": "Duel de trains à 2 joueurs, jouable dans le navigateur.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e4eff7",
+  "theme_color": "#12305f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

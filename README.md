@@ -104,6 +104,24 @@ Pour TURN en production, mets les trois valeurs dans les secrets du dépôt
 (`gh secret set VITE_TURN_URL`, etc.) : le workflow les lit déjà. Attention, ce
 sont des variables de build : elles finissent lisibles dans le bundle publié.
 
+## Icônes et aperçu de lien
+
+Tout est généré depuis `tools/icon-source.png` par `python tools/make-icons.py`
+(nécessite Pillow), qui écrit dans `public/`. Pour changer l'icône, remplace le
+fichier source et relance le script.
+
+| Fichier | Sert à |
+| --- | --- |
+| `favicon.ico` (16/32/48) | onglet du navigateur, raccourcis Windows |
+| `icon-32/192/512.png` | onglet, écran d'accueil Android, PWA |
+| `apple-touch-icon.png` | écran d'accueil iOS — Safari lit celui-ci et ignore le manifeste |
+| `og.png` (1200×630) | aperçu quand on envoie le lien (Slack, WhatsApp, Discord, iMessage) |
+| `manifest.webmanifest` | nom et icônes de l'app installée |
+
+Les `og:image` et `og:url` dans `index.html` sont des URL **absolues** : les
+robots des messageries ne résolvent pas les chemins relatifs. Si le site
+déménage, ce sont les deux lignes à corriger.
+
 ## Direction artistique
 
 Tout part de la photo de TGV Duplex dans `src/assets/train.webp` : elle sert
