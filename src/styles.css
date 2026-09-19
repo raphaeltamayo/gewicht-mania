@@ -66,6 +66,16 @@ button:disabled {
   opacity: 0.45;
   cursor: default;
 }
+/*
+ * Cards are rendered as disabled buttons whenever they are not actionable —
+ * the opponent's revealed bets, a settled duel. Fading those is wrong: the
+ * opponent's row is precisely what you compare your own against, so it has to
+ * stay at full strength. "Not clickable" is not the same as "not important".
+ */
+.bet:disabled,
+.card:disabled:not(.is-muted) {
+  opacity: 1;
+}
 button.primary {
   background: var(--blue-700);
   border-color: var(--blue-700);
@@ -563,35 +573,77 @@ code {
   font-variant-numeric: tabular-nums;
 }
 /*
- * The fill is what makes a bet readable at a glance: height is the value as a
- * fraction of 8, so two chips can be compared without reading either digit.
- * --fill and --ink are set per chip in BetChip.
+ * Bet cards carry their deck rank: 7 8 9 10 U O K A.
+ *
+ * The ordering is conveyed the way a real deck does it — the four pip cards are
+ * plain, then each court card is more dressed up than the last. Rank alone would
+ * still leave "is U above O?" to memory, so decoration escalates in step with it
+ * and you can rank two cards without knowing the deck.
  */
-.bet--filled {
+.bet--card {
   position: relative;
-  overflow: hidden;
   background: #fff;
+  border-color: var(--silver-300);
 }
-.bet--filled::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: var(--fill, 0%);
-  background: hsl(217 68% var(--ink, 50%));
+.bet__rank {
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
 }
-.bet__value {
-  position: relative;
-  /* Sits on white at the bottom of the scale and on deep blue at the top, so
-     the digit needs a colour that survives both: it follows the fill. */
-  color: var(--blue-900);
-  mix-blend-mode: normal;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+
+/* 7 to 10 — pip cards, deliberately flat. */
+.bet--card[data-tier='0'] .bet__rank {
+  color: var(--steel);
 }
-.bet--filled.is-strong .bet__value {
+
+/* Unter: the first court card. Tinted, and a rule down the left edge. */
+.bet--card[data-tier='1'] {
+  background: var(--blue-100);
+  border-color: #9fb8dd;
+}
+.bet--card[data-tier='1'] .bet__rank {
+  color: var(--blue-700);
+}
+
+/* Ober: solid livery. */
+.bet--card[data-tier='2'] {
+  background: var(--blue-500);
+  border-color: var(--blue-700);
+}
+.bet--card[data-tier='2'] .bet__rank {
+  color: #fff;
+}
+
+/* König: deepest blue, gold rule. */
+.bet--card[data-tier='3'] {
+  background: var(--blue-900);
+  border-color: var(--gold);
+}
+.bet--card[data-tier='3'] .bet__rank {
+  color: #fff;
+}
+
+/* Ass: the only carmine card on the board, and the only one that glints. */
+.bet--card[data-tier='4'] {
+  background: linear-gradient(160deg, var(--carmine), #a8203a);
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.bet--card[data-tier='4'] .bet__rank {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Court cards get corner pips, the way a face card is framed. */
+.bet--card[data-tier='2']::after,
+.bet--card[data-tier='3']::after,
+.bet--card[data-tier='4']::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  pointer-events: none;
 }
 .bet--empty {
   border-style: dashed;

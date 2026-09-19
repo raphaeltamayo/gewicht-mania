@@ -1,5 +1,4 @@
-import type { CSSProperties } from 'react';
-import { RULES } from '../engine/config';
+import { betRank, RULES } from '../engine/config';
 import { SUITS, SUIT_META, isHidden, type AnyCard, type PlayerState, type Stats, type Suit } from '../engine/types';
 import { Layers, SuitIcon, TrainFront } from './icons';
 import { TRAIN_PHOTO } from './photo';
@@ -39,14 +38,17 @@ export function CardView({
   );
 }
 
+/** Pip cards are flat; the three court cards and the ace get progressively more dressed up. */
+const tierOf = (value: number) => (value <= BET_MAX - 4 ? 0 : value - (BET_MAX - 4));
+
 /**
- * A bet card, 1 to 8.
+ * A bet card.
  *
- * The number alone was not enough to read the board: at a glance 1 and 8 look
- * the same, and betting is entirely about which of two numbers is bigger. So the
- * chip is filled in proportion to its value — a 1 is a sliver, an 8 is full —
- * and the fill deepens with it. Comparing two chips becomes a matter of looking
- * at the bars, not reading and ranking two digits.
+ * Plain numbers were unreadable on the river: betting is entirely about which of
+ * two cards is higher, and at a glance a 1 and an 8 look identical. Real card
+ * ranks solve it the way a physical deck does — the pip cards stay plain and
+ * each court card is visibly more decorated than the last, so "more styled"
+ * reads as "higher" without anyone having to recall an ordering.
  */
 export function BetChip({
   value,
@@ -62,19 +64,17 @@ export function BetChip({
   if (hidden) return <div className="bet bet--back" />;
   if (value === null) return <div className="bet bet--empty" onClick={onClick} />;
 
-  const level = value / BET_MAX;
+  const tier = tierOf(value);
   return (
     <button
       type="button"
-      className={`bet bet--filled ${selected ? 'is-selected' : ''} ${value > BET_MAX * 0.625 ? 'is-strong' : ''}`}
-      // Pale at 1, deep at 8. The digit flips to white past the point where the
-      // fill is dark enough to swallow dark ink.
-      style={{ '--fill': `${level * 100}%`, '--ink': `${88 - level * 56}%` } as CSSProperties}
+      className={`bet bet--card ${selected ? 'is-selected' : ''}`}
+      data-tier={tier}
       onClick={onClick}
       disabled={!onClick}
-      title={`Mise ${value} sur ${BET_MAX}`}
+      title={`${betRank(value)} — ${value}ᵉ mise sur ${BET_MAX}`}
     >
-      <span className="bet__value">{value}</span>
+      <span className="bet__rank">{betRank(value)}</span>
     </button>
   );
 }

@@ -59,6 +59,20 @@ export const RULES = {
   demoStatRange: [10, 30] as [number, number],
 };
 
+/**
+ * The bet deck's printed ranks, weakest first.
+ *
+ * The engine orders bets 1..8 because that is what comparing them needs, but the
+ * cards on the table are a German-suited deck: 7, 8, 9, 10, Unter, Ober, König,
+ * Ass. That is the vocabulary players use out loud, so the log speaks it too —
+ * a line reading "mise 8 contre 7" next to a board showing A and K is a puzzle
+ * nobody should have to solve.
+ */
+export const BET_RANKS = ['7', '8', '9', '10', 'U', 'O', 'K', 'A'];
+
+/** Printed rank of a bet value (1 = weakest). */
+export const betRank = (value: number) => BET_RANKS[value - 1] ?? String(value);
+
 /** Cards dealt in Étape 1 of a given round (1-indexed). */
 export const dealCount = (round: number) => RULES.baseDeal + (round - 1);
 

@@ -1,4 +1,4 @@
-import { attackCount, dealCount, RULES } from './config';
+import { attackCount, betRank, dealCount, RULES } from './config';
 import { buildDeck, drawDemoTrain } from './cards';
 import { randomInt, shuffle } from './rng';
 import {
@@ -270,13 +270,13 @@ function revealNext(state: GameState) {
 
   if (betA !== null && betB !== null && betA > betB) {
     giveRiverCard(state, i, 'A');
-    log(state, `Rivière ${i + 1} : A mise ${betA} contre ${betB}, A remporte la carte.`);
+    log(state, `Rivière ${i + 1} : A mise ${betRank(betA)} contre ${betRank(betB)}, A remporte la carte.`);
   } else if (betA !== null && betB !== null && betB > betA) {
     giveRiverCard(state, i, 'B');
-    log(state, `Rivière ${i + 1} : B mise ${betB} contre ${betA}, B remporte la carte.`);
+    log(state, `Rivière ${i + 1} : B mise ${betRank(betB)} contre ${betRank(betA)}, B remporte la carte.`);
   } else {
     slot.resolution = 'contested';
-    log(state, `Rivière ${i + 1} : égalité à ${betA}, la carte reste en jeu.`);
+    log(state, `Rivière ${i + 1} : égalité à ${betA === null ? '?' : betRank(betA)}, la carte reste en jeu.`);
   }
 
   state.revealIndex = i + 1;

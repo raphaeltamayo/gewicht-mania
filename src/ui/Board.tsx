@@ -411,7 +411,7 @@ function PhaseBar({
               disabled={mine.betsLocked || !mine.bets.some((b) => b === null)}
               onClick={() => dispatch({ type: 'fillBets', player: me })}
             >
-              <Shuffle size={15} /> Compléter au hasard
+              <Shuffle size={15} /> Au hasard
             </button>
             <button
               type="button"

@@ -45,9 +45,13 @@ duels, appliquer les dégâts) restent tes boutons, comme en hot-seat.
 ## Interface
 
 - Le minuteur de l'étape 2 est à **2 minutes** (`RULES.betSeconds`).
-- Les jetons de mise sont **remplis proportionnellement à leur valeur** : un 1 est
-  un filet, un 8 est plein. Comparer deux mises se fait en regardant les barres,
-  pas en lisant puis classant deux chiffres.
+- Les cartes de mise portent leurs **rangs de jeu** : `7 8 9 10 U O K A`
+  (`BET_RANKS` dans `src/engine/config.ts`). Les quatre cartes numérotées sont
+  volontairement plates, puis chaque figure est plus habillée que la précédente —
+  U teinté, O en livrée pleine, K bleu nuit filet or, A carmin. « Plus décoré »
+  se lit comme « plus fort » sans avoir à se rappeler l'ordre du paquet. Le
+  moteur continue de compter 1 à 8 en interne, et le journal parle le même
+  langage que la table : « A mise A contre K ».
 - **Compléter au hasard** remplit les cases vides avec les mises qu'il te reste,
   sans toucher à celles que tu as déjà posées.
 - **Rien ne se résout hors écran.** Chaque duel de rivière s'arrête sur son
