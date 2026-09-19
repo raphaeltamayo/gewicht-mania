@@ -214,6 +214,35 @@ code {
 .waiting {
   padding: 72px 16px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.waiting__lead {
+  font-size: 17px;
+  margin: 0;
+  color: var(--blue-900);
+}
+.waiting .muted {
+  margin: 0;
+  max-width: 34ch;
+}
+.sharecode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sharecode__value {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  /* The trailing letter-spacing would otherwise push the text off-centre. */
+  padding: 10px 8px 10px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--silver-300);
+  color: var(--blue-900);
 }
 
 /* ---------------------------------------------------------------- board */

@@ -120,13 +120,19 @@ export class Session {
     this.publish();
   }
 
+  /**
+   * Open a room and wait.
+   *
+   * Nothing is dealt until the guest is actually connected. Starting the game at
+   * `host()` time would run the Étape 2 timer against an empty chair, and worse,
+   * would let the host study the river and plan eight bets for as long as it
+   * takes the other player to arrive. The round begins when both are present.
+   */
   host() {
     this.mode = 'host';
     this.seat = 'A';
     this.code = makeCode();
     this.status = 'waiting';
-    this.authoritative = reduce(createGame(newSeed()), { type: 'startGame', seed: newSeed() });
-    this.view = redact(this.authoritative, 'A');
     this.emit();
 
     this.peer = new Peer(roomId(this.code), { config: { iceServers: ICE_SERVERS } });
@@ -139,6 +145,12 @@ export class Session {
       this.conn = conn;
       conn.on('open', () => {
         this.status = 'connected';
+        // Deal now, not at `host()` time, so the betting timer starts with both
+        // players looking at the board. Guarded so that a guest reconnecting
+        // rejoins the game in progress instead of wiping it.
+        if (!this.authoritative) {
+          this.authoritative = reduce(createGame(newSeed()), { type: 'startGame', seed: newSeed() });
+        }
         this.publish();
       });
       conn.on('data', (raw) => {

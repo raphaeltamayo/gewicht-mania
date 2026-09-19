@@ -23,7 +23,7 @@ Puis <http://localhost:5173>.
 ## Les quatre modes
 
 - **Solo contre le bot** : tu es le siège A, le bot tient le siège B. Voir plus bas.
-- **Créer une partie** : tu es le siège A, un code à 5 lettres s'affiche, tu le transmets à ton adversaire.
+- **Créer une partie** : tu es le siège A, un code à 5 lettres s'affiche, tu le transmets à ton adversaire. Rien n'est distribué tant qu'il n'a pas rejoint : le chrono de l'étape 2 ne tourne pas devant une chaise vide, et l'hôte ne peut pas étudier la rivière en avance.
 - **Rejoindre** : tu entres le code, tu es le siège B.
 - **Partie locale** : un seul écran, avec un rideau quand on se passe l'appareil. Pratique pour tester les règles seul.
 
