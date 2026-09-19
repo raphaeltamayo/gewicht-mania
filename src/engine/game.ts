@@ -41,6 +41,7 @@ function emptyPlayer(train: Train): PlayerState {
     bets: Array(RULES.riverSize).fill(null),
     betsLocked: false,
     buff: null,
+    buffLocked: false,
     attacks: [],
     attacksLocked: false,
     riverWins: 0,
@@ -97,6 +98,7 @@ function startRound(state: GameState) {
     ps.bets = Array(RULES.riverSize).fill(null);
     ps.betsLocked = false;
     ps.buff = null;
+    ps.buffLocked = false;
     ps.attacks = Array(attackCount(round)).fill(null);
     ps.attacksLocked = false;
     ps.riverWins = 0;
@@ -416,15 +418,39 @@ function enterBuffPhase(state: GameState) {
 
 function setBuff(state: GameState, player: PlayerId, cardId: string) {
   const ps = state.players[player];
-  if (ps.buff) return;
+  if (ps.buff || ps.buffLocked) return;
   const card = takeFromHand(state, player, cardId);
   if (!card) return;
   ps.buff = card;
+}
 
-  if (state.players.A.buff && state.players.B.buff) {
+/**
+ * Validating the buff is what actually commits it. Without this step the phase
+ * would advance the instant the second player picked a card, which left no
+ * window at all to undo a mis-tap — and against the bot, no window means none.
+ */
+function lockBuff(state: GameState, player: PlayerId) {
+  const ps = state.players[player];
+  if (!ps.buff) return;
+  ps.buffLocked = true;
+
+  if (state.players.A.buffLocked && state.players.B.buffLocked) {
     state.phase = 'attackPlacement';
     log(state, `Bataille : ${attackCount(state.round)} cartes d'attaque à placer.`);
   }
+}
+
+/**
+ * Take the buff back. Only legal while the buff phase is still running, which
+ * means the opponent has not committed yet: once both buffs are in, the engine
+ * has already moved on to `attackPlacement` and there is nothing to undo.
+ */
+function clearBuff(state: GameState, player: PlayerId) {
+  const ps = state.players[player];
+  if (ps.buffLocked) return;
+  if (!ps.buff || isHidden(ps.buff)) return;
+  ps.hand.push(ps.buff);
+  ps.buff = null;
 }
 
 function placeAttack(state: GameState, player: PlayerId, slot: number, cardId: string) {
@@ -595,6 +621,14 @@ export function reduce(prev: GameState, action: Action): GameState {
 
     case 'setBuff':
       if (state.phase === 'buff') setBuff(state, action.player, action.cardId);
+      break;
+
+    case 'clearBuff':
+      if (state.phase === 'buff') clearBuff(state, action.player);
+      break;
+
+    case 'lockBuff':
+      if (state.phase === 'buff') lockBuff(state, action.player);
       break;
 
     case 'placeAttack':

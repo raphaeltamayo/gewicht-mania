@@ -208,25 +208,62 @@ code {
 
 /* ---------------------------------------------------------------- board */
 
+/*
+ * The board is a fixed-height column: the phone is the target platform and the
+ * goal is that a turn never needs scrolling. Everything but the stage is sized
+ * by its content; the stage takes what is left and only scrolls internally when
+ * a late round genuinely outgrows the screen.
+ *
+ * `--slot-w` makes the eight river slots fit any width instead of overflowing,
+ * and every card on the board is sized from it.
+ */
 .board {
+  --slot-w: min(48px, calc((100vw - 76px) / 8));
+  --card-h: calc(var(--slot-w) * 1.37);
+
   max-width: 980px;
   margin: 0 auto;
-  padding: 12px 16px 48px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+}
+
+.board__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  overflow-y: auto;
 }
 
 .topbar {
+  flex: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 7px 12px;
   background: var(--blue-900);
   color: #fff;
   border-radius: 10px;
+}
+.topbar__title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.topbar__right {
+  flex: none;
+}
+.train,
+.phasebar {
+  flex: none;
 }
 .topbar .muted {
   color: #a9c0dd;
@@ -286,11 +323,31 @@ code {
 .train__head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 7px 12px;
   background: linear-gradient(90deg, var(--blue-100), #fff);
   border-bottom: 1px solid var(--silver-200);
+}
+.train__ident {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Card count stands in for the opponent's row of face-down cards. */
+.train__hand {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--blue-900);
+  background: #fff;
+  border: 1px solid var(--silver-300);
+  border-radius: 999px;
+  padding: 2px 9px;
 }
 .train__label {
   font-size: 11px;
@@ -307,16 +364,20 @@ code {
   color: var(--muted);
   font-size: 12px;
 }
+/* Four stats across, always: a 4-row stack costs more vertical space than the
+   board can spare on a phone. The stat names drop out on narrow screens; the
+   suit icon already identifies each one. */
 .train__stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 6px 18px;
-  padding: 10px 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 12px;
+  padding: 7px 12px;
 }
 .stat {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 .stat.is-dead {
   color: var(--carmine);
@@ -324,8 +385,10 @@ code {
 }
 .stat__name {
   color: var(--muted);
-  flex: 1;
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat__value {
   font-variant-numeric: tabular-nums;
@@ -355,8 +418,8 @@ code {
 /* cards */
 
 .card {
-  width: 48px;
-  height: 66px;
+  width: var(--slot-w, 48px);
+  height: var(--card-h, 66px);
   border-radius: 7px;
   border: 1px solid var(--silver-300);
   background: #fffdf8;
@@ -371,8 +434,8 @@ code {
   box-shadow: 0 1px 3px rgba(18, 48, 95, 0.14);
 }
 .card--sm {
-  width: 38px;
-  height: 52px;
+  width: calc(var(--slot-w, 48px) * 0.8);
+  height: calc(var(--card-h, 66px) * 0.8);
 }
 .card__value {
   font-size: 19px;
@@ -415,6 +478,20 @@ code {
 .card.is-muted {
   opacity: 0.5;
 }
+/*
+ * A card with no handler of its own renders as a disabled <button>, and a
+ * disabled button eats the click rather than letting it bubble. That silently
+ * broke tapping a river card to bet and tapping a placed attack to take it
+ * back: only the thin chip underneath responded. Letting the click pass through
+ * hands it to the enclosing .slot / .duel__stack, which is what wants it.
+ */
+.card:disabled {
+  pointer-events: none;
+}
+.slot,
+.duel__stack {
+  cursor: pointer;
+}
 
 /* river */
 
@@ -422,21 +499,20 @@ code {
   background: var(--panel);
   border: 1px solid var(--silver-300);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  overflow-x: auto;
+  gap: 6px;
+  align-items: center;
   box-shadow: 0 2px 8px rgba(18, 48, 95, 0.06);
 }
 .river__row {
   display: flex;
-  gap: 8px;
-  min-width: max-content;
+  gap: 4px;
 }
 .slot {
   position: relative;
-  width: 48px;
+  width: var(--slot-w, 48px);
   border-radius: 7px;
 }
 .slot.is-next {
@@ -473,8 +549,8 @@ code {
 }
 
 .bet {
-  width: 48px;
-  height: 32px;
+  width: var(--slot-w, 48px);
+  height: 30px;
   border-radius: 6px;
   border: 1px solid var(--silver-300);
   background: #fff;
@@ -499,10 +575,15 @@ code {
   outline-offset: 1px;
 }
 
+/* The eight bet cards are a fixed set, so they get a fixed eight-column grid:
+   one tidy row at any width, instead of 7 + 1 orphan when they wrap. */
 .bettray {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+}
+.bettray .bet {
+  width: 100%;
 }
 
 /* battle */
@@ -511,16 +592,26 @@ code {
   background: var(--panel);
   border: 1px solid var(--silver-300);
   border-radius: 12px;
-  padding: 14px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   box-shadow: 0 2px 8px rgba(18, 48, 95, 0.06);
 }
 .battle__buffs {
   display: flex;
-  gap: 28px;
+  gap: 24px;
   justify-content: center;
+}
+.buffslot.is-removable .card {
+  cursor: pointer;
+  outline: 2px dashed var(--gold);
+  outline-offset: 2px;
+}
+.buffslot__undo {
+  font-size: 10px;
+  color: var(--gold);
+  font-weight: 700;
 }
 .buffslot {
   display: flex;
@@ -536,21 +627,29 @@ code {
   align-items: center;
   gap: 4px;
 }
+/* Late rounds bring up to eight duels. Wrapping them would grow the board
+   downwards and force the page to scroll, so they stay on one line and the
+   strip scrolls sideways instead: the board's height stops depending on the
+   round number. */
 .battle__duels {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.duel {
+  flex: none;
 }
 .duel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: 4px;
+  padding: 6px;
   border: 2px solid transparent;
   border-radius: 10px;
-  min-width: 64px;
 }
 .duel.is-active {
   border-color: var(--gold);
@@ -574,49 +673,33 @@ code {
 
 /* hand and phase bar */
 
-.opp-hand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 0 4px;
-}
-.opp-hand__cards {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
+/* The hand is pinned to the bottom of the screen, thumb height. It stays one
+   row and scrolls sideways rather than wrapping, so its height never changes
+   as cards are won and spent. */
 .hand {
+  flex: none;
   background: var(--panel);
   border: 1px solid var(--silver-300);
   border-radius: 12px;
-  padding: 12px;
+  padding: 8px;
   box-shadow: 0 2px 8px rgba(18, 48, 95, 0.06);
-}
-.hand__label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 8px;
-  font-weight: 700;
 }
 .hand__cards {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
 }
 
 .phasebar {
   background: var(--blue-100);
   border: 1px solid var(--blue-700);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 9px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .phasebar--end {
   border-color: var(--gold);
@@ -663,6 +746,7 @@ code {
 }
 
 .log {
+  flex: none;
   font-size: 12px;
   color: var(--muted);
   display: flex;
@@ -676,6 +760,7 @@ code {
 }
 
 .hotseat {
+  flex: none;
   display: flex;
   justify-content: center;
 }
@@ -699,19 +784,74 @@ code {
   width: min(520px, 90vw);
 }
 
-@media (max-width: 560px) {
+/* Phones. Card sizes already scale through --slot-w; what changes here is how
+   much chrome survives: stat names, the train photo and the older log lines all
+   go, which is what buys the board its no-scroll fit. */
+@media (max-width: 700px) {
   .board {
-    padding: 8px 10px 32px;
+    --slot-w: min(44px, calc((100vw - 68px) / 8));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    gap: 6px;
   }
-  .card {
-    width: 40px;
-    height: 56px;
+  .stat__name {
+    display: none;
   }
-  .slot,
-  .bet {
-    width: 40px;
+  .train__stats {
+    gap: 3px 6px;
+    padding: 6px 10px;
+  }
+  .train__art {
+    display: none;
+  }
+  .train__head {
+    padding: 6px 10px;
+  }
+  .train__name {
+    font-size: 14px;
+  }
+  .train__meta {
+    display: none;
+  }
+  .log__line:not(.is-latest) {
+    display: none;
+  }
+  .phasebar__hint {
+    font-size: 12.5px;
+    gap: 6px;
+  }
+  .battle__buffs {
+    gap: 16px;
   }
   .lobby h1 {
     font-size: 32px;
+  }
+}
+
+/* Short screens (landscape phones, small laptops): drop the log entirely and
+   tighten further rather than letting the stage scroll. */
+@media (max-height: 640px) {
+  .log {
+    display: none;
+  }
+  .board {
+    gap: 5px;
+  }
+  .phasebar {
+    padding: 7px 10px;
+    gap: 6px;
+  }
+  .river,
+  .battle {
+    padding: 7px;
+    gap: 4px;
+  }
+}
+
+/* A touch device can't hover, so anything that only reveals itself on hover is
+   invisible here: keep the tap targets at a thumb-friendly minimum instead. */
+@media (pointer: coarse) {
+  .bet,
+  button {
+    min-height: 32px;
   }
 }

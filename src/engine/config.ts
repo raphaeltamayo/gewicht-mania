@@ -20,7 +20,7 @@ export const RULES = {
   deckMaxValue: 15,
 
   /** Étape 2 thinking-phase timer, in seconds. */
-  betSeconds: 60,
+  betSeconds: 120,
   /**
    * Bets not placed when the timer expires are filled in at random from the
    * player's unused bet cards.

@@ -20,11 +20,40 @@ Puis <http://localhost:5173>.
 | `bun run typecheck` | vérification TypeScript |
 | `bun run src/engine/sim.ts 2000` | simule 2000 parties et vérifie les invariants de règles |
 
-## Les trois modes
+## Les quatre modes
 
+- **Solo contre le bot** : tu es le siège A, le bot tient le siège B. Voir plus bas.
 - **Créer une partie** : tu es le siège A, un code à 5 lettres s'affiche, tu le transmets à ton adversaire.
 - **Rejoindre** : tu entres le code, tu es le siège B.
 - **Partie locale** : un seul écran, avec un rideau quand on se passe l'appareil. Pratique pour tester les règles seul.
+
+## Le bot
+
+`src/engine/bot.ts`. Il reçoit exactement la vue redactée qu'un adversaire
+distant recevrait : il ne voit ni ta main, ni tes mises, ni tes cartes face
+cachée. S'il a l'air de deviner, c'est un bug de `redact()`, pas du bot.
+
+Ce qu'il sait faire : classer la rivière et dépenser ses grosses mises sur les
+grosses cartes (avec un peu de bruit, sinon il joue la même permutation optimale
+à chaque manche), garder de quoi tenir l'étape 4 avant de miser une carte sur un
+duel, buffer la statistique la plus proche de zéro, et attaquer avec ses plus
+fortes cartes.
+
+Ce qu'il ne fait pas : les étapes de rythme (révéler la rivière, retourner les
+duels, appliquer les dégâts) restent tes boutons, comme en hot-seat.
+
+## Interface
+
+- Le minuteur de l'étape 2 est à **2 minutes** (`RULES.betSeconds`).
+- **Toute carte posée se reprend en la touchant** : une mise sur la rivière, une
+  carte d'attaque, ou le buff. Le buff se valide maintenant explicitement, comme
+  les mises et les attaques — sans ça, la phase basculait dès que l'adversaire
+  avait choisi et il n'y avait aucune fenêtre pour corriger une erreur.
+- Le plateau tient dans un écran de téléphone sans défilement : hauteur fixe en
+  `100dvh`, cartes dimensionnées depuis `--slot-w` pour que les 8 cases de la
+  rivière rentrent à n'importe quelle largeur. Les duels de l'étape 4 défilent
+  horizontalement dans leur bande, pour que la hauteur du plateau ne dépende pas
+  du numéro de manche.
 
 ## Connexion entre deux joueurs
 
@@ -46,13 +75,18 @@ L'écran d'accueil indique si TURN est configuré ou non.
 
 ## Héberger la version jouable
 
-Le dépôt peut rester **privé**. Attention : GitHub Pages sur un dépôt privé
-demande un plan payant. Utilise plutôt **Cloudflare Pages** ou **Vercel**, qui
-déploient depuis un dépôt privé gratuitement.
+En ligne ici : <https://raphaeltamayo.github.io/gewicht-mania/>
 
-Sur Cloudflare Pages : *Connect to Git* → ce dépôt → build command `bun run build`,
-output directory `dist`. Ajoute les variables `VITE_TURN_*` dans les settings du
-projet si tu utilises TURN.
+Le déploiement est automatique : `.github/workflows/deploy.yml` build avec bun et
+publie `dist/` sur GitHub Pages à chaque push sur `main`. Le dépôt est **public**,
+ce que Pages exige pour rester gratuit.
+
+Le `base` de Vite passe à `/gewicht-mania/` uniquement quand `GITHUB_ACTIONS` est
+défini, donc `bun run dev` continue de servir depuis la racine.
+
+Pour TURN en production, mets les trois valeurs dans les secrets du dépôt
+(`gh secret set VITE_TURN_URL`, etc.) : le workflow les lit déjà. Attention, ce
+sont des variables de build : elles finissent lisibles dans le bundle publié.
 
 ## Direction artistique
 

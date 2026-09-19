@@ -94,6 +94,8 @@ export type PlayerState = {
   bets: (number | null)[];
   betsLocked: boolean;
   buff: AnyCard | null;
+  /** The buff stays takeable-back until it is validated, same as bets and attacks. */
+  buffLocked: boolean;
   /** attacks[i] is the card committed to battle slot i. */
   attacks: (AnyCard | null)[];
   attacksLocked: boolean;
@@ -160,6 +162,8 @@ export type Action =
   | { type: 'commitDuelCard'; player: PlayerId; cardId: string }
   | { type: 'revealDuel' }
   | { type: 'setBuff'; player: PlayerId; cardId: string }
+  | { type: 'clearBuff'; player: PlayerId }
+  | { type: 'lockBuff'; player: PlayerId }
   | { type: 'placeAttack'; player: PlayerId; slot: number; cardId: string }
   | { type: 'clearAttack'; player: PlayerId; slot: number }
   | { type: 'lockAttacks'; player: PlayerId }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { hasTurn } from '../net/ice';
 import type { Session } from '../net/session';
-import { Hourglass, TrainFront, Users } from './icons';
+import { Bot, Hourglass, TrainFront, Users } from './icons';
 import { TRAIN_PHOTO } from './photo';
 
 export function Lobby({ session, onStarted }: { session: Session; onStarted: () => void }) {
@@ -29,6 +29,16 @@ export function Lobby({ session, onStarted }: { session: Session; onStarted: () 
       <p className="lobby__tag">Prototype, 2 joueurs</p>
 
       <div className="lobby__cards">
+        <div className="lobby__card">
+          <h2>
+            <Bot size={18} /> Solo contre le bot
+          </h2>
+          <p>Tu joues le siège A, le bot tient le siège B. Il ne voit ni ta main ni tes mises.</p>
+          <button type="button" className="primary" onClick={() => go(() => session.startSolo())}>
+            Jouer en solo
+          </button>
+        </div>
+
         <div className="lobby__card">
           <h2>
             <TrainFront size={18} /> Créer une partie

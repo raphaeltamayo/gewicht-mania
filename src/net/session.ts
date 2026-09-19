@@ -1,10 +1,11 @@
 import Peer, { type DataConnection } from 'peerjs';
+import { BOT_SEAT, HUMAN_SEAT, nextAction, thinkDelay } from '../engine/bot';
 import { createGame, newSeed, reduce } from '../engine/game';
 import { redact } from '../engine/redact';
 import type { Action, GameState, PlayerId } from '../engine/types';
 import { ICE_SERVERS } from './ice';
 
-export type Mode = 'local' | 'host' | 'guest';
+export type Mode = 'local' | 'solo' | 'host' | 'guest';
 export type NetStatus = 'idle' | 'waiting' | 'connecting' | 'connected' | 'disconnected' | 'error';
 
 type Message = { t: 'action'; action: Action } | { t: 'state'; state: GameState };
@@ -39,6 +40,7 @@ export class Session {
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
   private listeners = new Set<() => void>();
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -50,7 +52,7 @@ export class Session {
   }
 
   private get isAuthority() {
-    return this.mode === 'local' || this.mode === 'host';
+    return this.mode === 'local' || this.mode === 'solo' || this.mode === 'host';
   }
 
   private publish() {
@@ -60,6 +62,34 @@ export class Session {
       this.conn.send({ t: 'state', state: redact(this.authoritative, 'B') } satisfies Message);
     }
     this.emit();
+    this.scheduleBot();
+  }
+
+  /**
+   * Give the bot a turn after every state change. It gets the same redacted view
+   * a remote guest would, so it has no access to the human's hand. Each action it
+   * takes republishes and schedules the next one, which is how it places eight
+   * bets one at a time; it stops as soon as `nextAction` returns null.
+   */
+  private scheduleBot() {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+    if (this.mode !== 'solo' || !this.authoritative) return;
+
+    const botView = redact(this.authoritative, BOT_SEAT);
+    const action = nextAction(botView, BOT_SEAT);
+    if (!action) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      // The phase may have moved on while the bot was "thinking"; re-derive
+      // rather than replaying a decision made against a stale board.
+      if (this.mode !== 'solo' || !this.authoritative) return;
+      const fresh = nextAction(redact(this.authoritative, BOT_SEAT), BOT_SEAT);
+      if (fresh) this.apply(fresh);
+    }, thinkDelay(botView, BOT_SEAT));
   }
 
   // -------------------------------------------------------------------------
@@ -69,6 +99,15 @@ export class Session {
   startLocal() {
     this.mode = 'local';
     this.seat = 'A';
+    this.status = 'connected';
+    this.authoritative = reduce(createGame(newSeed()), { type: 'startGame', seed: newSeed() });
+    this.publish();
+  }
+
+  /** One human against the bot. The human always takes seat A. */
+  startSolo() {
+    this.mode = 'solo';
+    this.seat = HUMAN_SEAT;
     this.status = 'connected';
     this.authoritative = reduce(createGame(newSeed()), { type: 'startGame', seed: newSeed() });
     this.publish();
@@ -173,6 +212,8 @@ export class Session {
   }
 
   destroy() {
+    if (this.botTimer) clearTimeout(this.botTimer);
+    this.botTimer = null;
     this.conn?.close();
     this.peer?.destroy();
     this.listeners.clear();

@@ -1,5 +1,5 @@
 import { SUITS, SUIT_META, isHidden, type AnyCard, type PlayerState, type Stats, type Suit } from '../engine/types';
-import { SuitIcon, TrainFront } from './icons';
+import { Layers, SuitIcon, TrainFront } from './icons';
 import { TRAIN_PHOTO } from './photo';
 
 export function CardView({
@@ -79,11 +79,14 @@ export function TrainPanel({
   label,
   stats,
   tone,
+  handCount,
 }: {
   player: PlayerState;
   label: string;
   stats: Stats;
   tone: 'a' | 'b';
+  /** Cards held. Shown as a badge so the opponent's hand needs no row of its own. */
+  handCount?: number;
 }) {
   return (
     <div className={`train train--${tone}`}>
@@ -95,13 +98,19 @@ export function TrainPanel({
             <TrainFront size={20} />
           </span>
         )}
-        <div>
+        <div className="train__ident">
           <div className="train__label">{label}</div>
           <strong className="train__name">{player.train.name}</strong>{' '}
           <span className="train__meta">
             {player.train.origin}, {player.train.year}
           </span>
         </div>
+        {handCount !== undefined && (
+          <span className="train__hand" title={`${handCount} carte(s) en main`}>
+            <Layers size={13} />
+            {handCount}
+          </span>
+        )}
       </div>
       <div className="train__stats">
         {SUITS.map((s) => (

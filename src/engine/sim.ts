@@ -55,11 +55,11 @@ function nextActions(s: GameState, rand: () => number): Action[] {
     }
 
     case 'buff':
-      return PLAYERS.filter((p) => !s.players[p].buff).map((p) => ({
-        type: 'setBuff' as const,
-        player: p,
-        cardId: pick(handIds(s, p)),
-      }));
+      return PLAYERS.filter((p) => !s.players[p].buffLocked).map((p) =>
+        s.players[p].buff
+          ? { type: 'lockBuff' as const, player: p }
+          : { type: 'setBuff' as const, player: p, cardId: pick(handIds(s, p)) },
+      );
 
     case 'attackPlacement': {
       const out: Action[] = [];

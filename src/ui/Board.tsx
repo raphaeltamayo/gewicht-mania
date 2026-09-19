@@ -11,22 +11,23 @@ import {
   type PlayerId,
 } from '../engine/types';
 import type { Session } from '../net/session';
-import { Hourglass, Lock, SuitIcon, Swords, Users, Zap } from './icons';
+import { Bot, Hourglass, Lock, SuitIcon, Swords, Users, Zap } from './icons';
 import { BetChip, CardView, TrainPanel } from './pieces';
 
 const asCard = (c: AnyCard | null): Card | null => (c && !isHidden(c) ? c : null);
 
+/** Kept short: on a phone this shares the top bar with two pills. */
 const PHASE_TITLE: Record<GameState['phase'], string> = {
   lobby: 'En attente',
-  betting: 'Étape 2 : phase de réflexion',
-  reveal: 'Étape 3 : phase de révélation',
-  riverDuel: 'Étape 3 : duels de rivière',
-  buff: 'Étape 4 : buff',
-  attackPlacement: 'Étape 4 : placement des attaques',
-  battle: 'Étape 4 : bataille',
-  damage: 'Étape 4 : dégâts',
+  betting: 'É2 réflexion',
+  reveal: 'É3 révélation',
+  riverDuel: 'É3 duels',
+  buff: 'É4 buff',
+  attackPlacement: 'É4 attaques',
+  battle: 'É4 bataille',
+  damage: 'É4 dégâts',
   roundEnd: 'Fin de manche',
-  gameOver: 'Partie terminée',
+  gameOver: 'Terminé',
 };
 
 export function Board({ session }: { session: Session }) {
@@ -97,25 +98,28 @@ export function Board({ session }: { session: Session }) {
     }
   }
 
+  /** Clicking your own buff takes it back, as long as the phase is still open. */
+  const onClearBuff =
+    view.phase === 'buff' && mine.buff && !mine.buffLocked
+      ? () => dispatch({ type: 'clearBuff', player: me })
+      : undefined;
+
   const riverStage = view.phase === 'betting' || view.phase === 'reveal' || view.phase === 'riverDuel';
 
   return (
     <div className="board">
       <Header session={session} />
 
-      <TrainPanel player={theirs} label={`Adversaire (${foe})`} stats={theirs.stats} tone={foe === 'A' ? 'a' : 'b'} />
+      <TrainPanel
+        player={theirs}
+        label={session.mode === 'solo' ? 'Bot (B)' : `Adversaire (${foe})`}
+        stats={theirs.stats}
+        tone={foe === 'A' ? 'a' : 'b'}
+        handCount={theirs.hand.length}
+      />
 
-      <div className="opp-hand">
-        <Users size={14} />
-        <span>Main adverse</span>
-        <div className="opp-hand__cards">
-          {theirs.hand.map((c, i) => (
-            <CardView key={i} card={c} small />
-          ))}
-        </div>
-      </div>
-
-      {riverStage ? (
+      <main className="board__stage">
+        {riverStage ? (
         <section className="river">
           <div className="river__row">
             {theirs.bets.map((b, i) => (
@@ -149,11 +153,20 @@ export function Board({ session }: { session: Session }) {
             ))}
           </div>
         </section>
-      ) : (
-        <BattleStage view={view} me={me} onAttackSlot={onAttackSlot} />
-      )}
+        ) : (
+          <BattleStage view={view} me={me} onAttackSlot={onAttackSlot} onClearBuff={onClearBuff} />
+        )}
 
-      <TrainPanel player={mine} label={`Toi (${me})`} stats={mine.stats} tone={me === 'A' ? 'a' : 'b'} />
+        <LogView view={view} />
+      </main>
+
+      <TrainPanel
+        player={mine}
+        label={`Toi (${me})`}
+        stats={mine.stats}
+        tone={me === 'A' ? 'a' : 'b'}
+        handCount={mine.hand.length}
+      />
 
       <PhaseBar
         view={view}
@@ -165,7 +178,6 @@ export function Board({ session }: { session: Session }) {
       />
 
       <section className="hand">
-        <div className="hand__label">Ta main ({mine.hand.length})</div>
         <div className="hand__cards">
           {mine.hand.map((c, i) => {
             const card = asCard(c);
@@ -181,8 +193,6 @@ export function Board({ session }: { session: Session }) {
           })}
         </div>
       </section>
-
-      <LogView view={view} />
 
       {session.mode === 'local' && (
         <div className="hotseat">
@@ -228,14 +238,19 @@ function Header({ session }: { session: Session }) {
   };
   return (
     <header className="topbar">
-      <div>
+      <div className="topbar__title">
         <strong>Manche {view.round}</strong>
         <span className="muted"> · {PHASE_TITLE[view.phase]}</span>
       </div>
       <div className="topbar__right">
-        {session.mode !== 'local' && (
+        {(session.mode === 'host' || session.mode === 'guest') && (
           <span className={`pill pill--${session.status}`}>
             {session.code && <code>{session.code}</code>} {statusText[session.status]}
+          </span>
+        )}
+        {session.mode === 'solo' && (
+          <span className="pill">
+            <Bot size={13} /> Solo
           </span>
         )}
         <span className="pill">Siège {session.seat}</span>
@@ -248,10 +263,12 @@ function BattleStage({
   view,
   me,
   onAttackSlot,
+  onClearBuff,
 }: {
   view: GameState;
   me: PlayerId;
   onAttackSlot: (i: number) => void;
+  onClearBuff?: () => void;
 }) {
   const foe = OTHER[me];
   const mine = view.players[me];
@@ -261,7 +278,7 @@ function BattleStage({
     <section className="battle">
       <div className="battle__buffs">
         <BuffSlot label={`Buff ${foe}`} card={theirs.buff} />
-        <BuffSlot label="Ton buff" card={mine.buff} />
+        <BuffSlot label="Ton buff" card={mine.buff} onClick={onClearBuff} />
       </div>
 
       <div className="battle__duels">
@@ -297,12 +314,13 @@ function BattleStage({
   );
 }
 
-function BuffSlot({ label, card }: { label: string; card: AnyCard | null }) {
+function BuffSlot({ label, card, onClick }: { label: string; card: AnyCard | null; onClick?: () => void }) {
   const real = asCard(card);
   return (
-    <div className="buffslot">
+    <div className={`buffslot ${onClick ? 'is-removable' : ''}`}>
       <span className="muted">{label}</span>
-      <CardView card={card} small />
+      <CardView card={card} small onClick={onClick} />
+      {onClick && <span className="buffslot__undo">toucher pour retirer</span>}
       {real && (
         <span className="buffslot__effect">
           <Zap size={13} />+{real.value} {SUIT_META[real.suit].stat}
@@ -340,7 +358,7 @@ function PhaseBar({
                 <Lock size={15} /> Mises figées, en attente de l&apos;adversaire.
               </>
             ) : (
-              'Choisis une mise, puis clique la case sous la carte de rivière.'
+              'Choisis une mise, puis touche la case sous la carte. Touche une mise placée pour la retirer.'
             )}
           </div>
           {!mine.betsLocked && (
@@ -405,9 +423,21 @@ function PhaseBar({
         <div className="phasebar">
           <div className="phasebar__hint">
             <Zap size={15} />
-            {mine.buff
-              ? 'Buff placé, en attente de l’adversaire.'
-              : 'Choisis une carte de ta main : sa valeur s’ajoutera à la statistique de son signe.'}
+            {mine.buffLocked
+              ? 'Buff validé, en attente de l’adversaire.'
+              : mine.buff
+                ? 'Touche le buff pour le reprendre, ou valide.'
+                : 'Choisis une carte de ta main : sa valeur s’ajoutera à la statistique de son signe.'}
+          </div>
+          <div className="phasebar__actions">
+            <button
+              type="button"
+              className="primary"
+              disabled={!mine.buff || mine.buffLocked}
+              onClick={() => dispatch({ type: 'lockBuff', player: me })}
+            >
+              <Lock size={15} /> Valider mon buff
+            </button>
           </div>
         </div>
       );
@@ -420,7 +450,7 @@ function PhaseBar({
             <Swords size={15} />
             {mine.attacksLocked
               ? 'Attaques figées, en attente de l’adversaire.'
-              : `Sélectionne une carte puis une case d’attaque. ${remaining} restante(s).`}
+              : `Carte puis case d’attaque. Touche une carte placée pour la reprendre. ${remaining} restante(s).`}
           </div>
           <div className="phasebar__actions">
             <button
